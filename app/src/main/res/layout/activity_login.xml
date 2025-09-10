@@ -105,14 +105,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/input_height"
                 android:autofillHints="phone"
-                android:background="@drawable/txt_rounded_corner_white"
                 android:inputType="phone"
                 android:textColor="@color/white"
+                android:textCursorDrawable="@drawable/cursor_white"
                 android:paddingStart="@dimen/padding_input_start"
                 android:paddingEnd="@dimen/padding_input_start"
                 android:textSize="@dimen/text_size_lg"
-                tools:ignore="VisualLintTextFieldSize" />
-
+                tools:ignore="VisualLintTextFieldSize"/>
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Input Password -->
@@ -132,15 +131,16 @@
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/input_password"
+                style="@style/Widget.App.TextInputEditText.WhiteCursor"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/input_height"
                 android:autofillHints="password"
-                android:background="@drawable/txt_rounded_corner_white"
                 android:inputType="textPassword"
                 android:paddingStart="@dimen/padding_input_start"
                 android:paddingEnd="@dimen/padding_input_start"
                 android:textColor="@color/white"
                 android:textSize="@dimen/text_size_lg"
+                app:cursorColor="@color/white"
                 tools:ignore="VisualLintTextFieldSize" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -226,6 +226,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/bottom_sheet_handle"
-            app:layout_constraintWidth_percent="0.85" />
+            app:layout_constraintWidth_percent="0.85"
+            app:backgroundTint="@null"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

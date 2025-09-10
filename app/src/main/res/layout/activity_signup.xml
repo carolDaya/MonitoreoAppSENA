@@ -4,6 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
+    android:id="@+id/container_signup"
     android:layout_height="match_parent"
     android:background="@color/gray_300"
     tools:context=".ui.auth.SignupActivity">
@@ -56,33 +57,45 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/text_input_layout_name"
-                style="@style/Widget.App.TextInputLayout.Green"
+                style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/spacing_xxxxlarge"
-                app:layout_constraintTop_toBottomOf="@+id/top_green_section"
+                app:hintEnabled="true"
                 app:startIconDrawable="@drawable/ic_user_green"
+                app:layout_constraintTop_toBottomOf="@+id/top_green_section"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintWidth_percent="0.85">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_name"
-                    style="@style/Widget.App.TextInputEditText.Green"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/input_height"
                     android:hint="@string/register_name_hint"
                     android:autofillHints="name"
                     android:inputType="textPersonName"
                     tools:ignore="VisualLintTextFieldSize" />
             </com.google.android.material.textfield.TextInputLayout>
 
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/text_input_layout_phone"
-                style="@style/Widget.App.TextInputLayout.Green"
-                app:layout_constraintTop_toBottomOf="@+id/text_input_layout_name"
+                style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_medium"
+                app:hintEnabled="true"
                 app:startIconDrawable="@drawable/ic_phone_green"
+                app:layout_constraintTop_toBottomOf="@+id/text_input_layout_name"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintWidth_percent="0.85">
+
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/edit_text_phone"
-                    style="@style/Widget.App.TextInputEditText.Green"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/input_height"
                     android:hint="@string/register_phone_hint"
                     android:autofillHints="phone"
                     android:inputType="phone"
@@ -90,37 +103,47 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/text_input_layout_password"
-                style="@style/Widget.App.TextInputLayout.Green"
-                app:layout_constraintTop_toBottomOf="@+id/text_input_layout_phone"
+                android:id="@+id/input_password_layout"
+                style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_medium"
+                app:hintEnabled="true"
                 app:startIconDrawable="@drawable/ic_lock_green"
+                app:passwordToggleEnabled="true"
+                app:layout_constraintTop_toBottomOf="@+id/text_input_layout_phone"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:passwordToggleEnabled="true"
                 app:layout_constraintWidth_percent="0.85">
+
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_text_password"
-                    style="@style/Widget.App.TextInputEditText.Green"
+                    android:id="@+id/input_password"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/input_height"
                     android:hint="@string/register_password_hint"
-                    android:autofillHints="password"
                     android:inputType="textPassword"
                     tools:ignore="VisualLintTextFieldSize" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/text_input_layout_confirm_password"
-                style="@style/Widget.App.TextInputLayout.Green"
-                app:layout_constraintTop_toBottomOf="@+id/text_input_layout_password"
+                style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_medium"
+                app:hintEnabled="true"
+                app:passwordToggleEnabled="true"
                 app:startIconDrawable="@drawable/ic_lock_green"
+                app:layout_constraintTop_toBottomOf="@+id/input_password_layout"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:passwordToggleEnabled="true"
                 app:layout_constraintWidth_percent="0.85">
+
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/edit_text_confirm_password"
-                    style="@style/Widget.App.TextInputEditText.Green"
+                    android:id="@+id/input_confirm_password"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/input_height"
                     android:hint="@string/register_confirm_password_hint"
-                    android:autofillHints="newPassword"
                     android:inputType="textPassword"
                     tools:ignore="VisualLintTextFieldSize" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -141,6 +164,7 @@
                     android:layout_height="wrap_content"
                     android:text="@string/register_terms_checkbox"
                     android:textColor="@color/teal_dark"
+                    android:buttonTint="@color/teal_dark"
                     android:textSize="@dimen/text_size_s"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"/>
@@ -172,34 +196,16 @@
                 tools:ignore="VisualLintButtonSize" />
 
             <TextView
-                android:id="@+id/text_view_login_prompt"
+                android:id="@+id/text_login_link"
+                style="@style/TextAppearance.App.Link"
+                android:textColor="@color/teal_dark"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/spacing_medium"
-                android:layout_marginBottom="@dimen/spacing_large"
-                android:gravity="center"
-                android:text="@string/login_prompt"
-                android:textSize="@dimen/text_size_s"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toStartOf="@+id/text_view_login_link"
-                app:layout_constraintHorizontal_chainStyle="packed"
+                android:layout_marginTop="@dimen/spacing_small"
+                android:text="@string/login_si_prompt"
+                app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/button_register" />
-
-            <TextView
-                android:id="@+id/text_view_login_link"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/spacing_xsmall"
-                android:text="@string/login_link"
-                android:textColor="@color/black"
-                android:textSize="@dimen/text_size_s"
-                android:textStyle="bold"
-                app:layout_constraintBottom_toBottomOf="@+id/text_view_login_prompt"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toEndOf="@+id/text_view_login_prompt"
-                app:layout_constraintTop_toTopOf="@+id/text_view_login_prompt"
-                app:layout_constraintHorizontal_bias="0.0"/>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>

@@ -59,7 +59,7 @@
     <string name="login_button">Ingresar</string>
     <string name="login_remember_me">Recordarme</string>
     <string name="login_forgot_password">¿Olvidaste tu contraseña?</string>
-    <string name="login_prompt">¿Ya tienes una cuenta?</string>
+    <string name="login_prompt">¿No tienes una cuenta?</string>
     <string name="login_link">Iniciar sesión</string>
 
     <!-- ================= REGISTRO ================= -->
@@ -73,6 +73,7 @@
     <string name="register_terms_checkbox">Aceptar</string>
     <string name="register_terms_conditions">Términos y condiciones</string>
     <string name="register_button">Registrarse</string>
+    <string name="login_si_prompt">¿Ya tienes una cuenta?</string>
 
     <!-- ================= RESTABLECER CONTRASEÑA ================= -->
     <string name="forgot_password_title">¿Has olvidado tu contraseña?</string>
@@ -133,4 +134,27 @@
     <string name="ai_choose_voice">Elegir voz</string>
     <string name="ai_choose_tone">Elegir tono</string>
     <string name="ai_enable_voice_reading">Activar lectura de voz</string>
+
+
+    <string name="error_field_required">Este campo es obligatorio</string>
+    <string name="error_passwords_not_match">Las contraseñas no coinciden</string>
+    <string name="error_accept_terms">Debes aceptar los términos y condiciones</string>
+
+
+    <string name="title_sensor_data">Datos del Sensor</string>
+    <string name="desc_change_graph_icon">Icono para cambiar el tipo de gráfica</string>
+
+    <string name="gas_sensor_title">Estado del sensor de gas</string>
+    <string name="temperature_sensor_title">Estado del sensor de temperatura</string>
+    <string name="pressure_sensor_title">Estado del sensor de presión</string>
+
+    <string name="status_active">Activo</string>
+    <string name="status_inactive">Inactivo</string>
+    <string name="status_warning">Advertencia</string>
+
+    <string name="desc_graph_temperature">Gráfico de lecturas del sensor de temperatura.</string>
+
+
+    <string name="card_voice_title">Lectura de voz</string>
+    <string name="card_voice_subtitle">Activar lectura de datos por voz</string>
 </resources>

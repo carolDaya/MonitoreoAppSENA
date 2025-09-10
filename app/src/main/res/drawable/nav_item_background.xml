@@ -1,0 +1,8 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Cuando el item está presionado -->
+    <item android:state_pressed="true" android:drawable="@color/button_primary" />
+    <!-- Cuando el item está seleccionado (checked) -->
+    <item android:state_checked="true" android:drawable="@color/button_primary" />
+    <!-- Fondo normal -->
+    <item android:drawable="@android:color/transparent" />
+</selector>

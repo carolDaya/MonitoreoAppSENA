@@ -1,130 +1,162 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    app:cardBackgroundColor="@color/gray_300"
-    app:cardCornerRadius="@dimen/spacing_small"
-    app:cardElevation="@dimen/spacing_xsmall">
+    android:orientation="vertical"
+    android:padding="@dimen/spacing_large">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <TextView
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="@dimen/spacing_large">
+        android:text="@string/graphs_section_title"
+        android:textSize="@dimen/text_size_lg"
+        android:textStyle="bold"
+        android:layout_marginBottom="@dimen/spacing_large"/>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/spacing_large"
-            android:text="@string/graphs_section_title"
-            android:textSize="@dimen/text_size_lg"
-            android:textStyle="bold" />
+    <!-- Card Gas -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardGas"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_marginBottom="@dimen/spacing_large"
+        app:cardCornerRadius="@dimen/spacing_small"
+        app:cardElevation="@dimen/spacing_small"
+        app:cardBackgroundColor="@color/gray_300">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2"
-            android:layout_marginBottom="@dimen/spacing_large">
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="@dimen/spacing_small"
+            android:background="@drawable/txt_rounded_corner_green">
 
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/spacing_small"
-                android:layout_weight="1"
-                app:cardBackgroundColor="@color/gray_300"
-                app:cardCornerRadius="@dimen/spacing_small"
-                app:cardElevation="@dimen/spacing_xsmall">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/txt_rounded_corner_green"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="@dimen/spacing_small">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_xsmall"
-                        android:gravity="center"
-                        android:text="@string/menu_graph_gas"
-                        android:textSize="@dimen/text_size_xs" />
-
-                    <ImageView
-                        android:layout_width="@dimen/spacing_xxxlarge_mid"
-                        android:layout_height="@dimen/spacing_xxxlarge_mid"
-                        android:contentDescription="@string/desc_graph_gas"
-                        android:importantForAccessibility="yes"
-                        android:src="@drawable/ic_graph_metano_green"
-                        tools:ignore="ImageContrastCheck" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/spacing_small"
-                android:layout_weight="1"
-                app:cardBackgroundColor="@color/gray_300"
-                app:cardCornerRadius="@dimen/spacing_small"
-                app:cardElevation="@dimen/spacing_xsmall">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/txt_rounded_corner_green"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="@dimen/spacing_small">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_xsmall"
-                        android:gravity="center"
-                        android:text="@string/menu_graph_temp"
-                        android:textSize="@dimen/text_size_xs" />
-
-                    <ImageView
-                        android:layout_width="@dimen/spacing_xxxlarge_mid"
-                        android:layout_height="@dimen/spacing_xxxlarge_mid"
-                        android:contentDescription="@string/desc_graph_temp"
-                        android:src="@drawable/ic_graph_tem_green"
-                        tools:ignore="ImageContrastCheck" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-        </LinearLayout>
-
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/gray_300"
-            app:cardCornerRadius="@dimen/spacing_small"
-            app:cardElevation="@dimen/spacing_xsmall">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/txt_rounded_corner_green"
+                android:text="@string/menu_graph_gas"
+                android:textSize="@dimen/text_size_xs"
                 android:gravity="center"
-                android:orientation="vertical"
-                android:padding="@dimen/spacing_medium">
-                <TextView
+                android:layout_marginTop="@dimen/spacing_xsmall"/>
+
+            <FrameLayout
+                android:id="@+id/graphContainerGas"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <!-- Botón para cambiar la gráfica -->
+                <ImageView
+                    android:id="@+id/btnChangeGas"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/spacing_xsmall"
-                    android:gravity="center"
-                    android:text="@string/menu_graph_pressure"
-                    android:textSize="@dimen/text_size_s"
-                    android:textStyle="bold" />
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="8dp"
+                    android:clickable="true"
+                    android:contentDescription="@string/desc_change_graph_icon"
+                    android:focusable="true"
+                    android:src="@drawable/ic_change_chart" />
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
+    <!-- Card Temperatura -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardTemp"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_marginBottom="@dimen/spacing_large"
+        app:cardCornerRadius="@dimen/spacing_small"
+        app:cardElevation="@dimen/spacing_small"
+        app:cardBackgroundColor="@color/gray_300">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="@dimen/spacing_small"
+            android:background="@drawable/txt_rounded_corner_green">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/menu_graph_temp"
+                android:textSize="@dimen/text_size_xs"
+                android:gravity="center"
+                android:layout_marginTop="@dimen/spacing_xsmall"/>
+
+            <FrameLayout
+                android:id="@+id/graphContainerTemp"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <!-- Botón para cambiar la gráfica -->
                 <ImageView
-                    android:layout_width="@dimen/spacing_xxxxxlarge"
-                    android:layout_height="@dimen/spacing_xxxxxxlarge"
-                    android:contentDescription="@string/desc_graph_pressure"
-                    android:src="@drawable/ic_graph_presion_green"
-                    tools:ignore="ImageContrastCheck" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-    </LinearLayout>
-</androidx.cardview.widget.CardView>
+                    android:id="@+id/btnChangeTemp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="8dp"
+                    android:clickable="true"
+                    android:contentDescription="@string/desc_change_graph_icon"
+                    android:focusable="true"
+                    android:src="@drawable/ic_change_chart" />
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Card Presión -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardPressure"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        app:cardCornerRadius="@dimen/spacing_small"
+        app:cardElevation="@dimen/spacing_small"
+        app:cardBackgroundColor="@color/gray_300">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="@dimen/spacing_small"
+            android:background="@drawable/txt_rounded_corner_green">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/menu_graph_pressure"
+                android:textSize="@dimen/text_size_xs"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:layout_marginTop="@dimen/spacing_xsmall"/>
+
+            <FrameLayout
+                android:id="@+id/graphContainerPressure"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center">
+
+                <!-- Botón para cambiar la gráfica -->
+                <ImageView
+                    android:id="@+id/btnChangePressure"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="8dp"
+                    android:clickable="true"
+                    android:contentDescription="@string/desc_change_graph_icon"
+                    android:focusable="true"
+                    android:src="@drawable/ic_change_chart" />
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+</LinearLayout>

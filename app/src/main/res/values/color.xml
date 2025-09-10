@@ -14,6 +14,25 @@
     <color name="orange_light">#FFBD59</color>
     <color name="teal_dark">#2B524A</color>
     <color name="teal_deep">#368C8B</color>
+    <color name="gas_color">#FFA000</color> <color name="temp_color">#FF5252</color> <color name="pressure_color">#2196F3</color> <color name="pressure_color_high">#E53935</color>
+    <color name="pressure_color_medium">#FFEB3B</color>
+    <color name="pressure_color_low">#4CAF50</color>}
+    <color name="teal_200">#80CBC4</color>
+    <color name="teal_400">#26A69A</color>
+    <color name="teal_700">#00796B</color>
+
+    <color name="gas_high">#388E3C</color>
+    <color name="gas_medium">#66BB6A</color>
+    <color name="gas_low">#A5D6A7</color>
+
+    <color name="temp_high">#F57C00</color>
+    <color name="temp_medium">#FFA726</color>
+    <color name="temp_low">#FFCC80</color>
+
+    <color name="pressure_high">#1976D2</color>
+    <color name="pressure_medium">#42A5F5</color>
+    <color name="pressure_low">#90CAF9</color>
+
 
     <!-- Gray Scale -->
     <color name="gray_100">#EDE7D9</color>

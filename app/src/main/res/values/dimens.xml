@@ -40,6 +40,8 @@
     <dimen name="icon_size_small">24dp</dimen>
     <dimen name="icon_size_medium">32dp</dimen>
     <dimen name="icon_size_large">48dp</dimen>
+    <dimen name="bottom_sheet_peek_height">250dp</dimen>
+
 
     <!-- MEDIDAS ESPECIFICAS -->
     <dimen name="icon_size_lock_w">104dp</dimen>

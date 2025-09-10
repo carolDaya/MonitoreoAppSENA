@@ -31,6 +31,7 @@
         <item name="android:paddingStart">@dimen/spacing_medium</item>
         <item name="android:paddingEnd">@dimen/spacing_medium</item>
         <item name="android:drawablePadding">@dimen/spacing_sm</item>
+        <item name="boxStrokeColor">@color/green_icon</item>
     </style>
 
     <style name="Widget.App.TextInputEditText.CustomBackground" parent="">
