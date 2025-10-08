@@ -1,67 +1,96 @@
 package com.sena.monitoreo.ui.auth
 
+// CORRECCIÓN: Asegura que estas clases se importen del paquete correcto
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.widget.addTextChangedListener
-import com.google.android.material.textfield.TextInputEditText
-import com.sena.monitoreo.R
-import com.google.android.material.button.MaterialButton
+import com.sena.monitoreo.data.api.ApiService
+import com.sena.monitoreo.data.api.ResetPasswordRequest
+import com.sena.monitoreo.api.RetrofitClient
+import com.sena.monitoreo.databinding.ActivityResetPasswordBinding
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class ResetPasswordActivity : AppCompatActivity() {
 
-    private lateinit var inputNewPassword: TextInputEditText
-    private lateinit var inputConfirmPassword: TextInputEditText
-    private lateinit var buttonSetPassword: MaterialButton
+    private lateinit var binding: ActivityResetPasswordBinding
+
+    // CORRECCIÓN: Inicialización lazy para acceder a la instancia singleton.
+    private val apiService: ApiService by lazy {
+        RetrofitClient.instance
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContentView(R.layout.activity_reset_password)
+        binding = ActivityResetPasswordBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.container_reset)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
+        // Se eliminó la línea de inicialización incorrecta de apiService.
 
-        inputNewPassword = findViewById(R.id.input_new_password)
-        inputConfirmPassword = findViewById(R.id.input_confirm_new_password)
-        buttonSetPassword = findViewById(R.id.button_set_new_password)
+        // Obtiene el token desde la actividad anterior
+        val token = intent.getStringExtra("token") ?: ""
 
-        // Inicialmente desactivado hasta que se escriban contraseñas
-        buttonSetPassword.isEnabled = false
+        binding.buttonSetNewPassword.setOnClickListener {
+            val newPassword = binding.inputNewPassword.text.toString().trim()
+            val confirmPassword = binding.inputConfirmNewPassword.text.toString().trim()
 
-        val textWatcher = {
-            val newPass = inputNewPassword.text.toString().trim()
-            val confirmPass = inputConfirmPassword.text.toString().trim()
-            buttonSetPassword.isEnabled = newPass.isNotEmpty() && confirmPass.isNotEmpty()
-        }
-
-        inputNewPassword.addTextChangedListener { textWatcher() }
-        inputConfirmPassword.addTextChangedListener { textWatcher() }
-
-        // Acción del botón
-        buttonSetPassword.setOnClickListener {
-            val newPass = inputNewPassword.text.toString()
-            val confirmPass = inputConfirmPassword.text.toString()
-
-            if (newPass != confirmPass) {
-                Toast.makeText(this, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
-            } else if (newPass.length < 6) {
-                Toast.makeText(this, "La contraseña debe tener al menos 6 caracteres", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Contraseña restablecida correctamente", Toast.LENGTH_SHORT).show()
-                finish() // Cierra la actividad o navega a login
+            if (newPassword.isEmpty() || confirmPassword.isEmpty()) {
+                Toast.makeText(this, "Completa todos los campos", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+
+            if (newPassword != confirmPassword) {
+                Toast.makeText(this, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // CORRECCIÓN: Pasar solo la nueva contraseña. El token se usa en la solicitud.
+            resetPassword(token, newPassword)
         }
 
-        // Botón de regresar
-        findViewById<android.widget.ImageView>(R.id.back_arrow).setOnClickListener {
+        // Regresar atrás
+        binding.backArrow.setOnClickListener {
             finish()
         }
+    }
+
+    private fun resetPassword(token: String, newPassword: String) {
+        // Crea el objeto que se enviará al backend
+        // ASUME: ResetPasswordRequest es data class ResetPasswordRequest(val token: String, val password: String)
+        val request = ResetPasswordRequest()
+
+        // CORRECCIÓN CRÍTICA: Definir la variable 'call'
+        val call = apiService.resetPassword(request)
+
+        call.enqueue(object : Callback<Void> {
+            override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                if (response.isSuccessful) {
+                    Toast.makeText(
+                        this@ResetPasswordActivity,
+                        "Contraseña actualizada correctamente",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    val intent = Intent(this@ResetPasswordActivity, LoginActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                } else {
+                    Toast.makeText(
+                        this@ResetPasswordActivity,
+                        "Error al actualizar contraseña. Token inválido.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+
+            override fun onFailure(call: Call<Void>, t: Throwable) {
+                Toast.makeText(
+                    this@ResetPasswordActivity,
+                    "Error de conexión: ${t.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        })
     }
 }

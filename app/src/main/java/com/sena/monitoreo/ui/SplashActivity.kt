@@ -1,5 +1,6 @@
 package com.sena.monitoreo.ui
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -7,8 +8,8 @@ import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
 import com.sena.monitoreo.R
 import com.sena.monitoreo.ui.auth.LoginActivity
-import com.sena.monitoreo.ui.user.HomeUserActivity
 
+@SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
 
     private val SPLASH_TIME_OUT: Long = 4000 // 4 segundos

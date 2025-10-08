@@ -66,6 +66,12 @@ class LoginActivity : AppCompatActivity() {
         binding.inputPhone.addTextChangedListener(watcher)
         binding.inputPassword.addTextChangedListener(watcher)
 
+        // 🔹 NUEVO: Acción para "¿Olvidaste tu contraseña?"
+        binding.forgotPasswordText.setOnClickListener {
+            val intent = Intent(this, ForgotPasswordActivity::class.java)
+            startActivity(intent)
+        }
+
         // Login
         binding.loginButton.setOnClickListener {
             val phone = binding.inputPhone.text.toString()

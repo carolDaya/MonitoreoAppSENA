@@ -12,6 +12,7 @@ import com.sena.monitoreo.databinding.ActivityHomeUserBinding
 import com.sena.monitoreo.ui.auth.LoginActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
 
 class HomeUserActivity : AppCompatActivity() {
 
@@ -62,7 +63,7 @@ class HomeUserActivity : AppCompatActivity() {
                 else -> {
                     // Limpia los datos de sesión si los guardas en SharedPreferences
                     val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                    prefs.edit().clear().apply()
+                    prefs.edit { clear() }
 
                     // Ir al LoginActivity y limpiar el back stack
                     val intent = Intent(this, LoginActivity::class.java)

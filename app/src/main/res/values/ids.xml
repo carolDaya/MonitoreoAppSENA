@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="container_reset" type="id" />
+    <item name="input_new_password_layout" type="id" />
+    <item name="input_new_password" type="id" />
+    <item name="input_confirm_new_password_layout" type="id" />
+    <item name="input_confirm_new_password" type="id" />
+    <item name="button_set_new_password" type="id" />
+</resources>

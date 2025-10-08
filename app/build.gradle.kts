@@ -38,6 +38,28 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    // ⭐ BLOQUE DE SOLUCIÓN DEFINITIVA A ERRORES DE ARCHIVOS DUPLICADOS ⭐
+    // Dentro del bloque 'android { ... }'
+
+    packaging {
+        resources {
+            // Exclusiones necesarias para resolver conflictos de dependencias comunes
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/DEPENDENCIES"
+
+            // ⭐ NUEVA EXCLUSIÓN AÑADIDA PARA NETTY ⭐
+            excludes += "META-INF/io.netty.versions.properties"
+
+            // Otras exclusiones comunes de librerías grandes:
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/*.kotlin_module"
+            excludes += "META-INF/io.netty.versions.properties"
+        }
+    }
 }
 
 dependencies {
@@ -46,6 +68,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.firebase.appdistribution.gradle)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
