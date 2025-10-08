@@ -1,5 +1,6 @@
 package com.sena.monitoreo.ui.auth
 
+// Importaciones correctas asumiendo que consolidaste las clases en 'api'
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -7,14 +8,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-// Importaciones correctas asumiendo que consolidaste las clases en 'api'
-import com.sena.monitoreo.data.api.ForgotPasswordRequest
 import com.sena.monitoreo.data.api.ApiService
-import com.sena.monitoreo.api.RetrofitClient
+import com.sena.monitoreo.data.api.ForgotPasswordRequest
 import com.sena.monitoreo.databinding.ActivityForgotPasswordBinding
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+
+private val instance: ApiService
+    get() {
+        TODO()
+    }
 
 class ForgotPasswordActivity : AppCompatActivity() { // <- Propiedad dentro de la Activity
 
@@ -22,7 +26,7 @@ class ForgotPasswordActivity : AppCompatActivity() { // <- Propiedad dentro de l
 
     // CORRECCIÓN: La inicialización de apiService DEBE ir aquí, en la Activity.
     private val apiService: ApiService by lazy {
-        RetrofitClient.instance // <- Esto ahora debería ser reconocido si RetrofitClient.kt está bien
+        instance // <- Esto ahora debería ser reconocido si RetrofitClient.kt está bien
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

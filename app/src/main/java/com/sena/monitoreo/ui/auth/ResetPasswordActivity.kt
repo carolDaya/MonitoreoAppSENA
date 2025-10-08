@@ -7,11 +7,15 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.sena.monitoreo.data.api.ApiService
 import com.sena.monitoreo.data.api.ResetPasswordRequest
-import com.sena.monitoreo.api.RetrofitClient
 import com.sena.monitoreo.databinding.ActivityResetPasswordBinding
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+
+private val instance: ApiService
+    get() {
+        TODO()
+    }
 
 class ResetPasswordActivity : AppCompatActivity() {
 
@@ -19,7 +23,7 @@ class ResetPasswordActivity : AppCompatActivity() {
 
     // CORRECCIÓN: Inicialización lazy para acceder a la instancia singleton.
     private val apiService: ApiService by lazy {
-        RetrofitClient.instance
+        instance
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,7 +34,7 @@ class ResetPasswordActivity : AppCompatActivity() {
         // Se eliminó la línea de inicialización incorrecta de apiService.
 
         // Obtiene el token desde la actividad anterior
-        val token = intent.getStringExtra("token") ?: ""
+        intent.getStringExtra("token") ?: ""
 
         binding.buttonSetNewPassword.setOnClickListener {
             val newPassword = binding.inputNewPassword.text.toString().trim()
@@ -47,7 +51,7 @@ class ResetPasswordActivity : AppCompatActivity() {
             }
 
             // CORRECCIÓN: Pasar solo la nueva contraseña. El token se usa en la solicitud.
-            resetPassword(token, newPassword)
+            resetPassword()
         }
 
         // Regresar atrás
@@ -56,7 +60,7 @@ class ResetPasswordActivity : AppCompatActivity() {
         }
     }
 
-    private fun resetPassword(token: String, newPassword: String) {
+    private fun resetPassword() {
         // Crea el objeto que se enviará al backend
         // ASUME: ResetPasswordRequest es data class ResetPasswordRequest(val token: String, val password: String)
         val request = ResetPasswordRequest()
