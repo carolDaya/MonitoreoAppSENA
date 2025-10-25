@@ -157,4 +157,7 @@
 
     <string name="card_voice_title">Lectura de voz</string>
     <string name="card_voice_subtitle">Activar lectura de datos por voz</string>
+    <string name="todos">Todos</string>
+    <string name="activos">Activos</string>
+    <string name="bloqueados">Bloqueados</string>
 </resources>

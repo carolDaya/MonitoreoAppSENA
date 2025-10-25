@@ -1,5 +1,9 @@
 package com.sena.monitoreo.ui.admin
 
+// ***************************************************************
+// ¡IMPORTACIÓN QUE FALTABA AGREGADA!
+// Esto resuelve el error 'Unresolved reference UserManagementFragment'.
+// ***************************************************************
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -11,15 +15,26 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
-import androidx.drawerlayout.widget.DrawerLayout
-import com.github.mikephil.charting.charts.*
-import com.github.mikephil.charting.data.*
+import androidx.fragment.app.Fragment
+import com.github.mikephil.charting.charts.BarChart
+import com.github.mikephil.charting.charts.Chart
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.charts.PieChart
+import com.github.mikephil.charting.data.BarData
+import com.github.mikephil.charting.data.BarDataSet
+import com.github.mikephil.charting.data.BarEntry
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.data.PieData
+import com.github.mikephil.charting.data.PieDataSet
+import com.github.mikephil.charting.data.PieEntry
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.navigation.NavigationView
 import com.sena.monitoreo.R
 import com.sena.monitoreo.databinding.ActivityAdminDashboardBinding
 import com.sena.monitoreo.databinding.HeaderLayoutAdminBinding
-import com.sena.monitoreo.ui.auth.LoginActivity // Reemplaza con tu actividad de login
+import com.sena.monitoreo.ui.auth.LoginActivity
+
 
 class AdminDashboardActivity : AppCompatActivity() {
 
@@ -41,61 +56,82 @@ class AdminDashboardActivity : AppCompatActivity() {
         // Configuración de los listeners de clic para cambiar los gráficos
         setupChartClickListeners()
 
-        // Mostrar la sección de "home" por defecto
-        showSection(home = true)
+        // ***************************************************************
+        // LÓGICA CORREGIDA PARA CARGAR EL FRAGMENTO AL INICIO (si viene del menú)
+        // ***************************************************************
+        val scrollToSection = intent.getStringExtra("SCROLL_TO")
+
+        if (scrollToSection == "users") {
+            // 1. Aseguramos que solo esta sección esté visible
+            showOnlySection(binding.userAdminSection.root)
+
+            // 2. Cargamos el fragmento en el ID del CardView
+            loadFragment(UserManagementFragment(), R.id.card_view_user_management_container)
+        } else {
+            // Mostrar la sección de "home" por defecto
+            showSection(home = true)
+        }
+    }
+
+    // --- Funciones Auxiliares para Fragmentos y Vistas ---
+
+    /** Carga un fragmento en el contenedor especificado por su ID. */
+    private fun loadFragment(fragment: Fragment, containerId: Int) {
+        // Verifica si el fragmento ya está cargado para evitar duplicados
+        val existingFragment = supportFragmentManager.findFragmentById(containerId)
+
+        if (existingFragment == null || existingFragment::class.java != fragment::class.java) {
+            supportFragmentManager.beginTransaction()
+                .replace(containerId, fragment)
+                .commit()
+        }
+    }
+
+    /** Oculta todas las secciones estáticas menos la especificada. */
+    private fun showOnlySection(targetView: View) {
+        with(binding) {
+            graficasAdminSection.root.visibility = if (targetView == graficasAdminSection.root) View.VISIBLE else View.GONE
+            iaAdminSection.root.visibility = if (targetView == iaAdminSection.root) View.VISIBLE else View.GONE
+            userAdminSection.root.visibility = if (targetView == userAdminSection.root) View.VISIBLE else View.GONE
+        }
     }
 
     // --- Métodos de Navegación del Menú ---
 
     private fun setupNavigationDrawer() {
-        // Inicializa el binding del header
         headerBinding = HeaderLayoutAdminBinding.bind(binding.mainHeader.root)
 
-        // Configura el botón del menú para abrir el DrawerLayout
         headerBinding.settingsIcon.setOnClickListener {
             binding.adminDashboard.openDrawer(GravityCompat.START)
         }
 
-        // Configura el listener para los ítems del menú de navegación
         binding.navView.setNavigationItemSelectedListener { menuItem ->
             menuItem.isChecked = true
             binding.adminDashboard.closeDrawers()
 
             when (menuItem.itemId) {
-                R.id.nav_home -> {
-                    showSection(home = true)
-                }
-                R.id.nav_graphis -> {
-                    showSection(graphs = true)
-                }
-                R.id.nav_volumen -> {
-                    showSection(ai = true)
-                }
-                R.id.nav_users -> {
-                    showSection(users = true)
-                }
-                R.id.nav_settings -> {
-                    // Lógica para ir a la pantalla de configuración
-                    // val intent = Intent(this, SettingsActivity::class.java)
-                    // startActivity(intent)
-                }
-                R.id.nav_logout -> {
-                    // Lógica para cerrar sesión
-                    performLogout()
-                }
+                R.id.nav_home -> showSection(home = true)
+                R.id.nav_graphis -> showSection(graphs = true)
+                R.id.nav_volumen -> showSection(ai = true)
+                R.id.nav_users -> showSection(users = true) // <-- LLAMADA CORREGIDA
+                R.id.nav_settings -> { /* Lógica de settings */ }
+                R.id.nav_logout -> performLogout()
             }
             true
         }
     }
 
+    // ***************************************************************
+    // FUNCIÓN showSection CORREGIDA PARA CARGAR EL FRAGMENTO
+    // ***************************************************************
     private fun showSection(home: Boolean = false, graphs: Boolean = false, ai: Boolean = false, users: Boolean = false) {
         with(binding) {
-            // Oculta todas las secciones
+            // 1. Oculta todas las secciones
             graficasAdminSection.root.visibility = View.GONE
             iaAdminSection.root.visibility = View.GONE
             userAdminSection.root.visibility = View.GONE
 
-            // Muestra la sección o secciones correctas
+            // 2. Muestra la sección o secciones correctas
             when {
                 home -> {
                     graficasAdminSection.root.visibility = View.VISIBLE
@@ -109,21 +145,23 @@ class AdminDashboardActivity : AppCompatActivity() {
                     iaAdminSection.root.visibility = View.VISIBLE
                 }
                 users -> {
+                    // Muestra el contenedor de la sección de usuarios (el CardView)
                     userAdminSection.root.visibility = View.VISIBLE
+
+                    // Carga el Fragmento en el ID del CardView
+                    loadFragment(UserManagementFragment(), R.id.card_view_user_management_container)
                 }
             }
         }
     }
 
+    // ... (El resto de las funciones performLogout, setupCharts, setupChartClickListeners, y las de gráficos siguen igual) ...
     private fun performLogout() {
-        // Lógica para limpiar datos de sesión y redirigir
         val intent = Intent(this, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
     }
-
-    // --- Métodos de Configuración y Lógica de Gráficos ---
 
     @RequiresApi(Build.VERSION_CODES.M)
     private fun setupCharts() {

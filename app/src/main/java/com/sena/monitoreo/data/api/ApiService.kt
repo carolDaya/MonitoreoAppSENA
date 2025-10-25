@@ -4,16 +4,25 @@ import com.sena.monitoreo.data.model.LoginRequest
 import com.sena.monitoreo.data.model.LoginResponse
 import com.sena.monitoreo.data.model.RegisterRequest
 import com.sena.monitoreo.data.model.RegisterResponse
-import retrofit2.Call // ⭐ ESTO ES LO CORRECTO PARA LA INTERFAZ ⭐
+import com.sena.monitoreo.data.model.UserResponse
+import retrofit2.Call
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
-// Asumo que estas clases deben estar correctamente definidas en su respectivo paquete o aquí
+// 📦 Clases placeholder para los endpoints de recuperación de contraseña
 class ResetPasswordRequest()
 class ForgotPasswordRequest()
 
-// Define la interfaz de Retrofit
+// ✅ Interfaz principal de Retrofit
 interface ApiService {
+
+    // 🔐 Autenticación
+    @POST("auth/register")
+    fun register(@Body request: RegisterRequest): Call<RegisterResponse>
+
+    @POST("auth/login")
+    fun login(@Body request: LoginRequest): Call<LoginResponse>
 
     @POST("auth/forgot-password")
     fun forgotPassword(@Body request: ForgotPasswordRequest): Call<Void>
@@ -21,11 +30,13 @@ interface ApiService {
     @POST("auth/reset-password")
     fun resetPassword(@Body request: ResetPasswordRequest): Call<Void>
 
-    // ✅ CORRECCIÓN FINAL: Se usa Call<T>
-    @POST("auth/register")
-    fun register(@Body request: RegisterRequest): Call<RegisterResponse>
+    // 👥 Usuarios
+    @GET("users")
+    fun getAllUsers(): Call<List<UserResponse>>
 
-    // ✅ CORRECCIÓN FINAL: Se usa Call<T>
-    @POST("auth/login")
-    fun login(@Body request: LoginRequest): Call<LoginResponse>
+    @GET("users/activos")
+    fun getActiveUsers(): Call<List<UserResponse>>
+
+    @GET("users/bloqueados")
+    fun getBlockedUsers(): Call<List<UserResponse>>
 }

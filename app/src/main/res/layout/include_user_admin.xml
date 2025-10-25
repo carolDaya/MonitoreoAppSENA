@@ -2,7 +2,7 @@
 <androidx.cardview.widget.CardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_view_user_management_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     app:cardCornerRadius="@dimen/spacing_small"
@@ -32,25 +32,12 @@
             app:tabTextColor="@color/black"
             app:tabSelectedTextColor="@color/teal_deep"
             app:tabIndicatorColor="@color/teal_deep">
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/users_tab_active" />
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/users_tab_blocked" />
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/users_tab_all" />
         </com.google.android.material.tabs.TabLayout>
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view_usuarios"
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/view_pager_users"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:nestedScrollingEnabled="false"
-            tools:listitem="@layout/sec_item_user_admin"
-            tools:itemCount="3" />
+            android:layout_height="300dp"
+            android:layout_marginBottom="@dimen/spacing_small"/>
     </LinearLayout>
 </androidx.cardview.widget.CardView>
