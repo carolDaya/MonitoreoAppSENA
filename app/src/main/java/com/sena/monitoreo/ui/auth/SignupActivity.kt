@@ -9,7 +9,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.sena.monitoreo.databinding.ActivitySignupBinding
-import com.sena.monitoreo.data.model.RegisterRequest
+import com.sena.monitoreo.data.model.auth.RegisterRequest
 import com.sena.monitoreo.data.repository.AuthRepository
 import com.sena.monitoreo.ui.user.HomeUserActivity
 import kotlinx.coroutines.launch

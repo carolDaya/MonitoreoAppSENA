@@ -1,18 +1,16 @@
 package com.sena.monitoreo.data.api
 
-import com.sena.monitoreo.data.model.LoginRequest
-import com.sena.monitoreo.data.model.LoginResponse
-import com.sena.monitoreo.data.model.RegisterRequest
-import com.sena.monitoreo.data.model.RegisterResponse
+import com.sena.monitoreo.data.model.auth.LoginRequest
+import com.sena.monitoreo.data.model.auth.LoginResponse
+import com.sena.monitoreo.data.model.auth.RegisterRequest
+import com.sena.monitoreo.data.model.auth.RegisterResponse
 import retrofit2.Response
-import retrofit2.http.Body
-import retrofit2.http.POST
+import retrofit2.http.*
 
 interface ApiService {
-
-    @POST("auth/register")
+    @POST("register")
     suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
 
-    @POST("auth/login")
+    @POST("login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 }

@@ -1,4 +1,4 @@
-package com.sena.monitoreo.data.model
+package com.sena.monitoreo.data.model.auth
 
 data class LoginRequest(
     val telefono: String,

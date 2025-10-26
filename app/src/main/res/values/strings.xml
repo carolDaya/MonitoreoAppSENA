@@ -157,4 +157,5 @@
 
     <string name="card_voice_title">Lectura de voz</string>
     <string name="card_voice_subtitle">Activar lectura de datos por voz</string>
+    <string name="estado_sensor">Estado del sensor</string>
 </resources>

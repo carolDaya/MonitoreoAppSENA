@@ -63,4 +63,11 @@
     <color name="text_hint">@color/gray_500</color>
     <color name="text_on_primary">#EEEEEE</color>
 
+    <color name="temp_color_dark">#FF0D47A1</color>
+    <color name="temp_color_light">#FF90CAF9</color>
+    <color name="pressure_color_dark">#FF1B5E20</color>
+    <color name="pressure_color_light">#FFA5D6A7</color>
+    <color name="gas_color_dark">#FFB71C1C</color>
+    <color name="gas_color_light">#FFE57373</color>
+
 </resources>

@@ -4,17 +4,21 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/txt_rounded_corner_green"
     android:orientation="vertical"
+    android:background="@drawable/txt_rounded_corner_green"
     android:padding="@dimen/spacing_large">
 
+    <!-- Título de la card -->
     <TextView
         android:id="@+id/card_title"
+        android:fontFamily="@font/montserrat"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        tools:text="Estado del sensor de gas"
+        tools:text="@string/estado_sensor"
+        android:textSize="@dimen/text_size_l"
         style="@style/TextAppearance.CardTitle" />
 
+    <!-- Estado del sensor -->
     <TextView
         android:id="@+id/card_estado"
         android:layout_width="match_parent"
@@ -23,12 +27,13 @@
         tools:text="Activo"
         style="@style/TextAppearance.CardStatus" />
 
+    <!-- Icono y etiqueta -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/spacing_small"
-        android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="@dimen/spacing_small"
         tools:ignore="UseCompoundDrawables">
 
         <ImageView
@@ -42,13 +47,37 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/montserrat"
             android:text="@string/sensor_readings_realtime"
             style="@style/TextAppearance.CardLabel" />
     </LinearLayout>
 
-    <com.github.mikephil.charting.charts.LineChart
-        android:id="@+id/card_line_chart"
+    <!-- Contenedor de las gráficas -->
+    <FrameLayout
+        android:id="@+id/chart_container"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/height_section_top" />
+        android:layout_height="@dimen/height_section_top">
+
+        <!-- LineChart -->
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/chart_line"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"/>
+
+        <!-- BarChart -->
+        <com.github.mikephil.charting.charts.BarChart
+            android:id="@+id/chart_bar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"/>
+
+        <!-- PieChart -->
+        <com.github.mikephil.charting.charts.PieChart
+            android:id="@+id/chart_pie"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"/>
+    </FrameLayout>
 
 </LinearLayout>

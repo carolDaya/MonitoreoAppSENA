@@ -1,4 +1,4 @@
-package com.sena.monitoreo.data.model
+package com.sena.monitoreo.data.model.auth
 
 data class RegisterRequest(
     val nombre: String,
