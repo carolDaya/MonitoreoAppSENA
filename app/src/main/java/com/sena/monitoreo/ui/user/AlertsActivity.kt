@@ -15,6 +15,11 @@ class AlertsActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_alerts)
 
+        //agregarle color a las ondas de voz
+        val visualizer = findViewById<LineBarVisualizer>(R.id.voiceVisualizer)
+        visualizer.setColor(ContextCompat.getColor(this, android.R.color.black)) // Negro
+        visualizer.setDensity(60)
+
         // Ajustar insets del sistema
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.alerta_layout)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())

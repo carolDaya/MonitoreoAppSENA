@@ -51,6 +51,17 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.lottie)
     implementation(libs.mpchart)
+
+   // para las ondas
+    implementation("com.github.elevenetc:audio-visualizer:1.0.0")
+    implementation("com.github.Chesire:WaveformView:2.1.1")
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.10.0")
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.chibde:audiovisualizer:2.2.5")
+
     // Kotlin
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.core)

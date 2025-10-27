@@ -14,16 +14,29 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:contentDescription="@string/desc_icon_alert"
-        android:src="@drawable/img_user_alert"
         android:scaleType="centerInside"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        android:src="@drawable/img_user_alert"
         app:layout_constraintBottom_toTopOf="@id/alerta_title"
-        app:layout_constraintWidth_percent="0.5"
         app:layout_constraintDimensionRatio="3:2"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.497"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_chainStyle="packed"
+        app:layout_constraintWidth_percent="0.5"
         tools:ignore="ImageContrastCheck" />
+
+    <!-- Ondas de voz -->
+    <com.chibde.visualizer.LineBarVisualizer
+        android:id="@+id/voiceVisualizer"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:background="@android:color/transparent"
+        app:layout_constraintBottom_toTopOf="@+id/alerta"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:ignore="MissingClass" />
 
     <TextView
         android:id="@+id/alerta_title"
@@ -32,10 +45,11 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/spacing_large"
         android:text="@string/sensor_alert"
-        app:layout_constraintTop_toBottomOf="@+id/alerta"
         app:layout_constraintBottom_toTopOf="@id/ia_text_container"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toBottomOf="@+id/alerta" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/ia_text_container"
@@ -69,16 +83,18 @@
         android:layout_marginTop="@dimen/spacing_large"
         android:layout_marginBottom="@dimen/spacing_large"
         android:background="@drawable/btn_border_white_bg_green"
-        app:backgroundTint="@null"
         android:paddingTop="@dimen/spacing_medium"
         android:paddingBottom="@dimen/spacing_medium"
         android:text="@string/common_ok"
         android:textColor="@color/white"
         android:textSize="@dimen/text_size_l"
-        app:layout_constraintWidth_percent="0.85"
-        app:layout_constraintTop_toBottomOf="@id/ia_text_container"
+        app:backgroundTint="@null"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.491"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ia_text_container"
+        app:layout_constraintWidth_percent="0.85"
         tools:ignore="VisualLintButtonSize" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

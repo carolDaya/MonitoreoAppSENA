@@ -37,6 +37,16 @@ class AdminDashboardActivity : AppCompatActivity() {
         binding = ActivityAdminDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        LineBarVisualizer visualizer;
+
+        val visualizer = findViewById<LineBarVisualizer>(R.id.voiceVisualizer)
+        visualizer.setColor(ContextCompat.getColor(this, R.color.black_500))
+        visualizer.setDensity(70)
+        visualizer.setPlayer(0)
+
+
+
+        // Configuración de la navegación del menú
         // Menú lateral
         setupNavigationDrawer()
 

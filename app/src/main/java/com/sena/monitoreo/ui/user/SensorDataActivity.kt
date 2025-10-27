@@ -47,6 +47,18 @@ class SensorDataActivity : AppCompatActivity() {
         binding = ActivitySensorDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val visualizer = findViewById<LineBarVisualizer>(R.id.voiceVisualizer)
+        visualizer.setColor(ContextCompat.getColor(this, R.color.black_500))
+        visualizer.setDensity(70)
+        visualizer.setPlayer(0) // 0 = salida de audio global del sistema
+
+        override fun onPause() {
+            super.onPause()
+            val visualizer = findViewById<LineBarVisualizer>(R.id.voiceVisualizer)
+            visualizer.release()
+        }
+
+        // Lanza la actualización periódica
         lifecycleScope.launch {
             while (true) {
                 cargarSensoresYGraficas()
@@ -290,4 +302,5 @@ class SensorDataActivity : AppCompatActivity() {
         chart.legend.isEnabled = true
         chart.invalidate()
     }
+
 }
