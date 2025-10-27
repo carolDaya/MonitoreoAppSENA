@@ -160,4 +160,5 @@
     <string name="todos">Todos</string>
     <string name="activos">Activos</string>
     <string name="bloqueados">Bloqueados</string>
+    <string name="estado_sensor">Estado del sensor</string>
 </resources>

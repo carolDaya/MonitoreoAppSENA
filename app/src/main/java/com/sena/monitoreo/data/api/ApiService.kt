@@ -1,14 +1,16 @@
 package com.sena.monitoreo.data.api
 
-import com.sena.monitoreo.data.model.LoginRequest
-import com.sena.monitoreo.data.model.LoginResponse
-import com.sena.monitoreo.data.model.RegisterRequest
-import com.sena.monitoreo.data.model.RegisterResponse
 import com.sena.monitoreo.data.model.UserResponse
 import retrofit2.Call
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import com.sena.monitoreo.data.model.auth.LoginRequest
+import com.sena.monitoreo.data.model.auth.LoginResponse
+import com.sena.monitoreo.data.model.auth.RegisterRequest
+import com.sena.monitoreo.data.model.auth.RegisterResponse
+import retrofit2.Response
+import retrofit2.http.*
 
 // 📦 Clases placeholder para los endpoints de recuperación de contraseña
 class ResetPasswordRequest()

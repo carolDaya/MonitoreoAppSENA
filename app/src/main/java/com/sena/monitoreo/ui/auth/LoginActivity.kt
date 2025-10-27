@@ -10,10 +10,16 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
-import com.sena.monitoreo.data.model.LoginRequest
+import com.sena.monitoreo.data.model.auth.LoginRequest
+// Asegúrate de que este modelo tenga la propiedad 'rol'
 import com.sena.monitoreo.data.repository.AuthRepository
 import com.sena.monitoreo.databinding.ActivityLoginBinding
+// Importa la actividad de usuario
 import com.sena.monitoreo.ui.user.HomeUserActivity
+// Importa la actividad de administrador (DEBES CREAR ESTA CLASE)
+import com.sena.monitoreo.ui.admin.HomeAdminActivity // ASUMIDO
+// Importa la actividad de registro (SignupActivity)
+import com.sena.monitoreo.ui.auth.SignupActivity // ASUMIDO
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -101,10 +107,19 @@ class LoginActivity : AppCompatActivity() {
 
                     if (response.isSuccessful && response.body() != null) {
                         val user = response.body()!!
-                        Log.d("LoginActivity", "Login exitoso: usuario=${user.usuario}")
+                        Log.d("LoginActivity", "Login exitoso: usuario=${user.usuario}, rol=${user.rol}")
+
+                        // Lógica de validación de rol para redirigir
+                        val intent = if (user.rol == "admin") {
+                            Intent(this@LoginActivity, HomeAdminActivity::class.java)
+                        } else {
+                            Intent(this@LoginActivity, HomeUserActivity::class.java)
+                        }
+
                         Snackbar.make(binding.containerLogin, "Bienvenido ${user.usuario}", Snackbar.LENGTH_SHORT).show()
-                        startActivity(Intent(this@LoginActivity, HomeUserActivity::class.java))
+                        startActivity(intent) // Usa el Intent basado en el rol
                         finish()
+
                     } else {
                         val msg = response.errorBody()?.string()
                         val errorMessage = try {

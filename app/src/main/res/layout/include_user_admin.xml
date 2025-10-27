@@ -18,6 +18,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/montserrat_extrabold"
             android:text="@string/users_section_title"
             android:textSize="@dimen/text_size_lg"
             android:textStyle="bold"
@@ -32,6 +33,21 @@
             app:tabTextColor="@color/black"
             app:tabSelectedTextColor="@color/teal_deep"
             app:tabIndicatorColor="@color/teal_deep">
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/montserrat"
+                android:text="@string/users_tab_active" />
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/montserrat"
+                android:text="@string/users_tab_blocked" />
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:fontFamily="@font/montserrat"
+                android:layout_height="wrap_content"
+                android:text="@string/users_tab_all" />
         </com.google.android.material.tabs.TabLayout>
 
         <androidx.viewpager2.widget.ViewPager2

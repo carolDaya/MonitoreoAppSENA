@@ -2,23 +2,19 @@ package com.sena.monitoreo.data.repository
 
 
 import com.sena.monitoreo.data.api.RetrofitClient
-import com.sena.monitoreo.data.model.LoginRequest
-import com.sena.monitoreo.data.model.LoginResponse
-import com.sena.monitoreo.data.model.RegisterRequest
-import com.sena.monitoreo.data.model.RegisterResponse
+import com.sena.monitoreo.data.model.auth.LoginRequest
+import com.sena.monitoreo.data.model.auth.LoginResponse
+import com.sena.monitoreo.data.model.auth.RegisterRequest
+import com.sena.monitoreo.data.model.auth.RegisterResponse
 import retrofit2.Response
 
 class AuthRepository {
 
-    // ✅ CORRECCIÓN: Llamamos a Retrofit y ejecutamos la llamada de forma síncrona con .execute()
-    fun register(request: RegisterRequest): Response<RegisterResponse> {
-        // Ejecuta la llamada y espera la respuesta Response<T>
-        return RetrofitClient.api.register(request).execute()
+    suspend fun register(request: RegisterRequest): Response<RegisterResponse> {
+        return RetrofitClient.apiAuth.register(request)
     }
 
-    // ✅ CORRECCIÓN: Llamamos a Retrofit y ejecutamos la llamada de forma síncrona con .execute()
-    fun login(request: LoginRequest): Response<LoginResponse> {
-        // Ejecuta la llamada y espera la respuesta Response<T>
-        return RetrofitClient.api.login(request).execute()
+    suspend fun login(request: LoginRequest): Response<LoginResponse> {
+        return RetrofitClient.apiAuth.login(request)
     }
 }

@@ -29,4 +29,7 @@
         android:checked="false"
         app:thumbTint="@color/white"
         app:trackTint="@color/teal_dark" />
+
+
+
 </LinearLayout>
