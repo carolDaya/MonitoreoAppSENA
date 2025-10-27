@@ -41,16 +41,6 @@ class LoginActivity : AppCompatActivity() {
             insets
         }
 
-        // SharedPreferences para recordar sesión
-        val prefs = getSharedPreferences("login_prefs", MODE_PRIVATE)
-        val remember = prefs.getBoolean("REMEMBER", false)
-        if (remember) {
-            binding.inputPhone.setText(prefs.getString("PHONE", ""))
-            binding.inputPassword.setText(prefs.getString("PASSWORD", ""))
-            binding.checkboxRememberMe.isChecked = true
-            binding.loginButton.visibility = View.VISIBLE
-        }
-
         // Función para mostrar u ocultar botón según inputs
         fun checkInputs() {
             val phone = binding.inputPhone.text?.toString()?.trim()
@@ -76,21 +66,6 @@ class LoginActivity : AppCompatActivity() {
         binding.loginButton.setOnClickListener {
             val phone = binding.inputPhone.text.toString()
             val password = binding.inputPassword.text.toString()
-
-            // Guardar en SharedPreferences si se seleccionó "Recordarme"
-            if (binding.checkboxRememberMe.isChecked) {
-                with(prefs.edit()) {
-                    putString("PHONE", phone)
-                    putString("PASSWORD", password)
-                    putBoolean("REMEMBER", true)
-                    apply()
-                }
-            } else {
-                with(prefs.edit()) {
-                    clear()
-                    apply()
-                }
-            }
 
             val request = LoginRequest(phone, password)
             lifecycleScope.launch {
