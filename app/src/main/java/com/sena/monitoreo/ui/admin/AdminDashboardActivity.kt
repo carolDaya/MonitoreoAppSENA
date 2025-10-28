@@ -4,23 +4,33 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.mikephil.charting.charts.*
 import com.github.mikephil.charting.data.*
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.tabs.TabLayout
 import com.sena.monitoreo.R
+import com.sena.monitoreo.data.api.RetrofitClient
+import com.sena.monitoreo.data.model.user.UserResponse
 import com.sena.monitoreo.data.repository.GraficasRepository
+import com.sena.monitoreo.data.repository.UserRepository
 import com.sena.monitoreo.databinding.ActivityAdminDashboardBinding
 import com.sena.monitoreo.databinding.HeaderLayoutAdminBinding
+import com.sena.monitoreo.ui.admin.adapter.UserAdapter
 import com.sena.monitoreo.ui.auth.LoginActivity
 import kotlinx.coroutines.launch
 
@@ -28,6 +38,7 @@ class AdminDashboardActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAdminDashboardBinding
     private lateinit var headerBinding: HeaderLayoutAdminBinding
+    private lateinit var userAdapter: UserAdapter
     private val graficasRepo = GraficasRepository()
     private val TAG = "AdminDashboard"
 
@@ -38,7 +49,9 @@ class AdminDashboardActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupNavigationDrawer()
-        cargarGraficasGuardadas()  // 🔹 Carga real desde el backend
+        setupRecyclerView()
+        setupTabs()
+        cargarGraficasGuardadas()
         setupChartClickListeners()
         showSection(home = true)
     }
@@ -61,7 +74,10 @@ class AdminDashboardActivity : AppCompatActivity() {
                 R.id.nav_home -> showSection(home = true)
                 R.id.nav_graphis -> showSection(graphs = true)
                 R.id.nav_volumen -> showSection(ai = true)
-                R.id.nav_users -> showSection(users = true)
+                R.id.nav_users -> {
+                    showSection(users = true)
+                    loadUsers("all") // Cargar usuarios al abrir sección
+                }
                 R.id.nav_logout -> performLogout()
             }
             true
@@ -103,6 +119,122 @@ class AdminDashboardActivity : AppCompatActivity() {
     }
 
     // ----------------------------------------------------------
+    // 🔹 Configuración del RecyclerView de Usuarios
+    // ----------------------------------------------------------
+    private fun setupRecyclerView() {
+        val recycler = binding.userAdminSection.recyclerViewUsuarios
+        recycler.layoutManager = LinearLayoutManager(this)
+        userAdapter = UserAdapter(emptyList()) { user ->
+            showUserDialog(user)
+        }
+        recycler.adapter = userAdapter
+    }
+
+    // ----------------------------------------------------------
+    // 🔹 Configuración de Tabs para filtrar usuarios
+    // ----------------------------------------------------------
+    private fun setupTabs() {
+        val tabLayout = binding.userAdminSection.tabLayoutUsuarios
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                when (tab?.position) {
+                    0 -> loadUsers("active")
+                    1 -> loadUsers("blocked")
+                    2 -> loadUsers("all")
+                }
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
+    }
+
+    // ----------------------------------------------------------
+    // 🔹 Cargar usuarios desde el backend
+    // ----------------------------------------------------------
+    private fun loadUsers(type: String) {
+        lifecycleScope.launch {
+            try {
+                val response = when (type) {
+                    "active" -> RetrofitClient.apiUser.getActiveUsers()
+                    "blocked" -> RetrofitClient.apiUser.getBlockedUsers()
+                    else -> RetrofitClient.apiUser.getAllUsers()
+                }
+
+                if (response.isSuccessful) {
+                    val users = response.body() ?: emptyList()
+                    userAdapter.updateList(users)
+                    Log.d(TAG, "$type -> ${users.size} usuarios cargados")
+                } else {
+                    showError("Error al obtener usuarios (${response.code()})")
+                }
+
+            } catch (e: Exception) {
+                showError("Error de conexión: ${e.message}")
+            }
+        }
+    }
+
+    // ----------------------------------------------------------
+    // 🔹 Diálogo de detalles del usuario con bloqueo/desbloqueo
+    // ----------------------------------------------------------
+    private fun showUserDialog(user: UserResponse) {
+        val dialogView = LayoutInflater.from(this)
+            .inflate(R.layout.dialog_admin_card_user, null)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        val txtName = dialogView.findViewById<TextView>(R.id.textViewUserName)
+        val btnClose = dialogView.findViewById<ImageButton>(R.id.buttonCloseDialog)
+        val btnBlock = dialogView.findViewById<MaterialButton>(R.id.buttonBlockUser)
+
+        txtName.text = user.nombre
+
+        // Actualizar texto del botón según el estado del usuario
+        btnBlock.text = if (user.estado == "activo") "Bloquear Usuario" else "Desbloquear Usuario"
+
+        btnClose.setOnClickListener { dialog.dismiss() }
+
+        btnBlock.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+                    val nuevoEstado = if (user.estado == "activo") "bloqueado" else "activo"
+                    val repo = UserRepository()
+                    val success = repo.updateEstado(user.id, nuevoEstado)
+
+                    if (success) {
+                        Toast.makeText(
+                            this@AdminDashboardActivity,
+                            "Usuario ${user.nombre} ahora está $nuevoEstado",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        loadUsers("all") // Recargar lista
+                    } else {
+                        Toast.makeText(
+                            this@AdminDashboardActivity,
+                            "Error al actualizar estado",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@AdminDashboardActivity,
+                        "Error: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } finally {
+                    dialog.dismiss()
+                }
+            }
+        }
+
+        dialog.show()
+    }
+
+    // ----------------------------------------------------------
     // 🔹 Carga de configuraciones de gráficas desde backend
     // ----------------------------------------------------------
     @RequiresApi(Build.VERSION_CODES.M)
@@ -110,7 +242,7 @@ class AdminDashboardActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 Log.d(TAG, "🔄 Solicitando configuración de gráficas al servidor...")
-                val configuraciones = graficasRepo.getGraficas() // 👉 Petición GET real
+                val configuraciones = graficasRepo.getGraficas()
 
                 if (configuraciones.isEmpty()) {
                     Log.w(TAG, "⚠️ No hay configuraciones guardadas, usando valores por defecto")
@@ -118,7 +250,6 @@ class AdminDashboardActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                // Cargar cada gráfica según la configuración del backend
                 configuraciones.forEach { config ->
                     val tipo = config.tipo_grafica
                     val sensorId = config.sensor_id
@@ -297,5 +428,13 @@ class AdminDashboardActivity : AppCompatActivity() {
         container.removeAllViews()
         container.addView(chart)
         container.addView(button)
+    }
+
+    // ----------------------------------------------------------
+    // Manejo de errores
+    // ----------------------------------------------------------
+    private fun showError(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        Log.e(TAG, message)
     }
 }

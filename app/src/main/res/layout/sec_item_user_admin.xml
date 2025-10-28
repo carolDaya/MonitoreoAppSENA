@@ -2,49 +2,61 @@
 <androidx.cardview.widget.CardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="@dimen/spacing_small"
-    app:cardCornerRadius="@dimen/spacing_small"
-    app:cardElevation="@dimen/spacing_xxsmall"
-    app:cardBackgroundColor="@color/gray_300">
+    android:layout_margin="8dp"
+    app:cardElevation="0dp"
+    app:cardCornerRadius="12dp"
+    app:cardBackgroundColor="@android:color/transparent">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
+        android:padding="9dp"
         android:gravity="center_vertical"
-        android:padding="@dimen/spacing_sm"
         android:background="@drawable/txt_rounded_corner_green">
 
+        <!-- 🟢 Indicador de estado -->
         <ImageView
             android:id="@+id/img_indicador_estado"
-            android:layout_width="@dimen/spacing_medium"
-            android:layout_height="@dimen/spacing_medium"
-            android:contentDescription="@string/desc_icon_status_active"
-            android:src="@drawable/ic_admin_active_user"
-            tools:ignore="ImageContrastCheck" />
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="12dp"
+            android:contentDescription="@string/estado_usuario"
+            android:src="@drawable/ic_admin_active_user" />
 
+        <!-- 👤 Nombre del usuario -->
         <TextView
             android:id="@+id/text_nombre_usuario"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/spacing_small"
-            android:text="@string/user_title"
-            android:textSize="@dimen/text_size_m" />
+            android:layout_weight="1"
+            android:text="Nombre del usuario"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:ellipsize="end"
+            android:maxLines="1" />
 
+        <!-- 🔍 Botón Ver -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_ver_usuario"
-            style="@style/Widget.MaterialComponents.Button.TextButton.Icon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/user_view"
-            android:textColor="#00695C"
+            android:text="Ver"
+            android:textAllCaps="false"
+            android:textSize="14sp"
+            app:cornerRadius="20dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             app:icon="@drawable/ic_admin_visibility_user"
+            app:iconTint="@android:color/black"
             app:iconGravity="textStart"
-            app:iconTint="@color/teal_deep" />
+            app:strokeColor="@color/black"
+            app:strokeWidth="1dp"
+            android:paddingHorizontal="10dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp" />
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>
