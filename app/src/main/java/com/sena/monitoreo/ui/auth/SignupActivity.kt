@@ -1,21 +1,24 @@
 package com.sena.monitoreo.ui.auth
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.sena.monitoreo.R
+import com.sena.monitoreo.data.model.auth.RegisterRequest
+import com.sena.monitoreo.data.repository.AuthRepository
 import com.sena.monitoreo.databinding.ActivitySignupBinding
 import com.sena.monitoreo.ui.user.HomeUserActivity
-import androidx.core.net.toUri
+import kotlinx.coroutines.launch
 
 class SignupActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySignupBinding
+    private val authRepository = AuthRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,49 +26,64 @@ class SignupActivity : AppCompatActivity() {
         binding = ActivitySignupBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Ajuste de los márgenes de la ventana para una visualización de borde a borde
         ViewCompat.setOnApplyWindowInsetsListener(binding.containerSignup) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        // Lógica del botón de retroceso para cerrar la actividad
-        binding.backArrow.setOnClickListener {
-            finish()
-        }
+        binding.backArrow.setOnClickListener { finish() }
 
-        // Navegación a la pantalla de inicio de sesión cuando se hace clic en el enlace
         binding.textLoginLink.setOnClickListener {
-            val intent = Intent(this, LoginActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }
 
-        // Lógica para el clic en "Términos y condiciones"
         binding.textViewTermsAndConditions.setOnClickListener {
-            Toast.makeText(this, "Redireccionando a los términos y condiciones...", Toast.LENGTH_SHORT).show()
-            val url = "www.google.com" // Ejemplo de URL
-            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-            startActivity(intent)
+            Toast.makeText(this, "Redireccionando a los términos...", Toast.LENGTH_SHORT).show()
         }
 
-        // Lógica del botón de registro: valida el formulario y navega si es correcto
+        // 🟢 Aquí cambiamos la lógica del botón:
         binding.buttonRegister.setOnClickListener {
             if (validateForm()) {
-                // Si la validación es exitosa, muestra un mensaje y navega a la siguiente pantalla
-                Toast.makeText(this, "Registro exitoso", Toast.LENGTH_SHORT).show()
-                val intent = Intent(this, HomeUserActivity::class.java)
-                startActivity(intent)
-                finish()
+                registerUser()
             }
         }
     }
 
-    /**
-     * Valida todos los campos del formulario de registro.
-     * @return true si todos los campos son válidos, false en caso contrario.
-     */
+    private fun registerUser() {
+        val request = RegisterRequest(
+            nombre = binding.editTextName.text.toString().trim(),
+            telefono = binding.editTextPhone.text.toString().trim(),
+            password = binding.inputPassword.text.toString().trim(),
+            confirm_password = binding.inputConfirmPassword.text.toString().trim()
+        )
+
+        lifecycleScope.launch {
+            try {
+                val response = authRepository.register(request)
+
+                if (response.isSuccessful) {
+                    val message = response.body()?.message ?: "Registro exitoso"
+                    Toast.makeText(this@SignupActivity, message, Toast.LENGTH_SHORT).show()
+
+                    val intent = Intent(this@SignupActivity, HomeUserActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                } else {
+                    Toast.makeText(
+                        this@SignupActivity,
+                        "Error al registrar: ${response.errorBody()?.string()}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@SignupActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                e.printStackTrace()
+            }
+        }
+    }
+
     private fun validateForm(): Boolean {
         val name = binding.editTextName.text.toString().trim()
         val phone = binding.editTextPhone.text.toString().trim()
@@ -73,48 +91,35 @@ class SignupActivity : AppCompatActivity() {
         val confirmPassword = binding.inputConfirmPassword.text.toString().trim()
         val termsAccepted = binding.checkboxTerms.isChecked
 
-        // Limpia los errores de los campos para la validación actual
         binding.textInputLayoutName.error = null
         binding.textInputLayoutPhone.error = null
         binding.inputPasswordLayout.error = null
         binding.textInputLayoutConfirmPassword.error = null
 
-        // Comprueba si el nombre está vacío
         if (name.isBlank()) {
             binding.textInputLayoutName.error = getString(R.string.error_field_required)
             return false
         }
-
-        // Comprueba si el teléfono está vacío
         if (phone.isBlank()) {
             binding.textInputLayoutPhone.error = getString(R.string.error_field_required)
             return false
         }
-
-        // Comprueba si la contraseña está vacía
         if (password.isBlank()) {
             binding.inputPasswordLayout.error = getString(R.string.error_field_required)
             return false
         }
-
-        // Comprueba si la confirmación de la contraseña está vacía
         if (confirmPassword.isBlank()) {
             binding.textInputLayoutConfirmPassword.error = getString(R.string.error_field_required)
             return false
         }
-
-        // Verifica si las contraseñas coinciden
         if (password != confirmPassword) {
             binding.textInputLayoutConfirmPassword.error = getString(R.string.error_passwords_not_match)
             return false
         }
-
-        // Verifica si se aceptaron los términos y condiciones
         if (!termsAccepted) {
             Toast.makeText(this, getString(R.string.error_accept_terms), Toast.LENGTH_SHORT).show()
             return false
         }
-
         return true
     }
 }
