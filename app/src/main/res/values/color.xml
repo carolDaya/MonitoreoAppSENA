@@ -5,6 +5,8 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="gold">#EDB232</color>
+    <color name="red">#FFB71C1C</color>
+
     <color name="turquoise">#00C9B6</color>
     <color name="brown_light">#CD7F32</color>
     <color name="green_primary">#4CAF50</color>
@@ -69,5 +71,4 @@
     <color name="pressure_color_light">#FFA5D6A7</color>
     <color name="gas_color_dark">#FFB71C1C</color>
     <color name="gas_color_light">#FFE57373</color>
-
 </resources>
