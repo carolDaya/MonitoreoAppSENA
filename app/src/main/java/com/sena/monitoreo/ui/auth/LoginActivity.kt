@@ -2,6 +2,7 @@ package com.sena.monitoreo.ui.auth
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -64,30 +65,45 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Llamada a la API con corrutinas
+            Log.d("LoginActivity", "Intentando iniciar sesión con teléfono: $phone")
+
             lifecycleScope.launch {
                 try {
+                    Log.d("LoginActivity", "Enviando petición al servidor...")
                     val response = authRepository.login(LoginRequest(phone, password))
+                    Log.d("LoginActivity", "Respuesta recibida del servidor. Código: ${response.code()}")
+
                     if (response.isSuccessful) {
                         val loginResponse = response.body()
+                        Log.d("LoginActivity", "Cuerpo de respuesta: $loginResponse")
 
                         if (loginResponse != null) {
                             Toast.makeText(this@LoginActivity, "Inicio de sesión exitoso", Toast.LENGTH_SHORT).show()
+                            Log.d("LoginActivity", "Usuario: ${loginResponse.usuario}, Rol: ${loginResponse.rol}")
 
-                            // Redirigir según rol
                             when (loginResponse.rol.lowercase()) {
-                                "admin" -> startActivity(Intent(this@LoginActivity, HomeAdminActivity::class.java))
-                                else -> startActivity(Intent(this@LoginActivity, HomeUserActivity::class.java))
+                                "admin" -> {
+                                    Log.d("LoginActivity", "Redirigiendo a HomeAdminActivity")
+                                    startActivity(Intent(this@LoginActivity, HomeAdminActivity::class.java))
+                                }
+                                else -> {
+                                    Log.d("LoginActivity", "Redirigiendo a HomeUserActivity")
+                                    startActivity(Intent(this@LoginActivity, HomeUserActivity::class.java))
+                                }
                             }
 
                             finish()
                         } else {
+                            Log.e("LoginActivity", "Error: respuesta vacía del servidor")
                             Toast.makeText(this@LoginActivity, "Error: respuesta vacía del servidor", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        Toast.makeText(this@LoginActivity, "Credenciales inválidas", Toast.LENGTH_SHORT).show()
+                        val errorBody = response.errorBody()?.string()
+                        Log.e("LoginActivity", "Error de autenticación. Código: ${response.code()}, cuerpo: $errorBody")
+                        Toast.makeText(this@LoginActivity, "Credenciales inválidas o error ${response.code()}", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
+                    Log.e("LoginActivity", "Error de conexión o excepción inesperada", e)
                     Toast.makeText(this@LoginActivity, "Error de conexión: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
