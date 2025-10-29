@@ -1,10 +1,10 @@
-// Archivo: com.sena.monitoreo.ui.user.SensorDataActivity.kt
-
 package com.sena.monitoreo.ui.user
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.View
 import android.widget.TextView
@@ -12,33 +12,38 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
 import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.PieChart
-import com.github.mikephil.charting.data.BarData
-import com.github.mikephil.charting.data.BarDataSet
-import com.github.mikephil.charting.data.BarEntry
-import com.github.mikephil.charting.data.Entry
-import com.github.mikephil.charting.data.LineData
-import com.github.mikephil.charting.data.LineDataSet
-import com.github.mikephil.charting.data.PieData
-import com.github.mikephil.charting.data.PieDataSet
-import com.github.mikephil.charting.data.PieEntry
+import com.github.mikephil.charting.data.*
+import com.google.android.material.button.MaterialButton
+import com.masoudss.lib.WaveformSeekBar
 import com.sena.monitoreo.R
-import com.sena.monitoreo.databinding.ActivitySensorDataBinding
 import com.sena.monitoreo.data.repository.GraficasRepository
-import com.sena.monitoreo.data.repository.LecturaRepository // 👈 IMPORTANTE: Nuevo repositorio
+import com.sena.monitoreo.data.repository.LecturaRepository
+import com.sena.monitoreo.databinding.ActivitySensorDataBinding
+import com.sena.monitoreo.ui.auth.LoginActivity // Necesario para el Logout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.*
+import kotlin.random.Random // Necesario para el waveform simulado
 
-class SensorDataActivity : AppCompatActivity() {
+class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var binding: ActivitySensorDataBinding
     private val graficasRepo = GraficasRepository()
-    private val lecturaRepo = LecturaRepository() // 👈 NUEVA INSTANCIA
+    private val lecturaRepo = LecturaRepository()
     private val TAG = "SensorDataActivity"
     private val refreshTime = 5 * 60 * 1000L // 5 minutos
+
+    // PROPIEDADES PARA VOZ Y ONDAS
+    private var tts: TextToSpeech? = null
+    private var isSpeaking = false
+    private lateinit var waveformSeekBar: WaveformSeekBar
+    private lateinit var btnPlay: MaterialButton
+    private val TTS_MESSAGE = "Hola" // MENSAJE HARCODEADO PARA PRUEBAS
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,12 +52,153 @@ class SensorDataActivity : AppCompatActivity() {
         binding = ActivitySensorDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 1. INICIALIZAR VOZ/ONDAS
+        tts = TextToSpeech(this, this)
+        initWaveformViews()
+
+        // 2. CONFIGURAR MENÚ LATERAL
+        binding.headerUser.settingsIcon.setOnClickListener { // headerUser es el ID del <include>
+            binding.containerSensor.openDrawer(GravityCompat.START)
+        }
+        setupNavigationView()
+
+        // 3. INICIAR CARGA DE DATOS EN VIVO
         lifecycleScope.launch {
             while (true) {
                 cargarSensoresYGraficas()
                 delay(refreshTime)
             }
         }
+    }
+
+    // ---------------------------------------------------------------------
+    //                       IMPLEMENTACIÓN DE VOZ Y MENÚ
+    // ---------------------------------------------------------------------
+
+    private fun setupNavigationView() {
+        binding.navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    val intent = Intent(this, HomeUserActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    startActivity(intent)
+                }
+                R.id.nav_datos_gas, R.id.nav_datos_tem, R.id.nav_datos_presion -> {
+                    Toast.makeText(this, "Ya estás en la pantalla de datos", Toast.LENGTH_SHORT).show()
+                }
+                R.id.nav_settings -> {
+                    Toast.makeText(this, "Configuración Usuario", Toast.LENGTH_SHORT).show()
+                }
+                R.id.nav_logout -> {
+                    stopSpeaking()
+                    val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    prefs.edit().clear().apply()
+                    val intent = Intent(this, LoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    Toast.makeText(this, "Sesión cerrada", Toast.LENGTH_SHORT).show()
+                }
+            }
+            binding.containerSensor.closeDrawer(GravityCompat.START)
+            true
+        }
+    }
+
+    private fun initWaveformViews() {
+        // Asumiendo que el include de header_layout_user tiene una sección con ID 'waveform_section'
+        val waveformBinding = binding.headerUser.waveformSection
+
+        waveformSeekBar = waveformBinding.waveformSeekBar
+        btnPlay = waveformBinding.btnPlayMessage
+
+        setupWaveformSamples()
+
+        btnPlay.setOnClickListener {
+            if (!isSpeaking) startSpeaking() else stopSpeaking()
+        }
+    }
+
+    private fun setupWaveformSamples() {
+        // Crear datos de muestra (harcodeados) para el waveform
+        val samples = IntArray(100) {
+            Random.nextInt(10, 100) // Valores aleatorios entre 10 y 100
+        }
+        waveformSeekBar.setSampleFrom(samples)
+        waveformSeekBar.progress = 0f
+    }
+
+    private fun startSpeaking() {
+        // USANDO EL MENSAJE HARCODEADO
+        speakText(TTS_MESSAGE)
+        isSpeaking = true
+        btnPlay.setIconResource(R.drawable.ic_stop)
+        startWaveformAnimation()
+    }
+
+    private fun stopSpeaking() {
+        tts?.stop()
+        isSpeaking = false
+        btnPlay.setIconResource(R.drawable.ic_play)
+        waveformSeekBar.progress = 0f
+    }
+
+    private fun startWaveformAnimation() {
+        lifecycleScope.launch {
+            val duration = 3000L // Duración estimada de "Hola"
+            val steps = duration / 50L
+            val progressStep = waveformSeekBar.maxProgress / steps.toFloat()
+
+            for (i in 0 until steps.toInt()) {
+                if (!isSpeaking) break
+
+                // 1. Actualizar progreso
+                waveformSeekBar.progress += progressStep
+
+                // 2. Simular movimiento de ondas (cambiando los samples dinámicamente)
+                val dynamicSamples = IntArray(100) {
+                    Random.nextInt(5, 95)
+                }
+                waveformSeekBar.setSampleFrom(dynamicSamples)
+
+                delay(50L)
+            }
+
+            // Cuando termina la simulación o el TTS deja de hablar
+            stopSpeaking()
+        }
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            val result = tts?.setLanguage(Locale("es", "ES"))
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                Log.e(TAG, "Idioma de TTS no compatible")
+                btnPlay.isEnabled = false
+            } else {
+                btnPlay.isEnabled = true
+            }
+        } else {
+            Log.e(TAG, "Error con TextToSpeech: $status")
+            btnPlay.isEnabled = false
+        }
+    }
+
+    private fun speakText(text: String) {
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "TTS_ID")
+    }
+
+    override fun onBackPressed() {
+        if (binding.containerSensor.isDrawerOpen(GravityCompat.START)) {
+            binding.containerSensor.closeDrawer(GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        tts?.stop()
+        tts?.shutdown()
     }
 
     // ---------------------------------------------------------------------
@@ -98,16 +244,12 @@ class SensorDataActivity : AppCompatActivity() {
         try {
             Log.d(TAG, "🔄 Cargando configuración y lecturas desde el servidor...")
 
-            val configuraciones = graficasRepo.getGraficas() // Obtiene el tipo de gráfica
+            val configuraciones = graficasRepo.getGraficas()
 
             if (configuraciones.isEmpty()) {
                 Log.w(TAG, "⚠️ No hay configuraciones guardadas, mostrando gráficas por defecto")
                 runOnUiThread {
-                    Toast.makeText(
-                        this@SensorDataActivity,
-                        "No hay configuraciones del administrador",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@SensorDataActivity, "No hay configuraciones del administrador", Toast.LENGTH_SHORT).show()
                 }
                 mostrarGraficasPorDefecto()
                 return
@@ -117,7 +259,6 @@ class SensorDataActivity : AppCompatActivity() {
                 val sensorId = config.sensor_id
                 val tipoGrafica = config.tipo_grafica
 
-                // Obtener color según el sensor
                 val color = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     getSensorColor(sensorId)
                 } else {
@@ -136,20 +277,14 @@ class SensorDataActivity : AppCompatActivity() {
                     else -> return@forEach
                 }
 
-                // 🔹 Obtener lecturas reales desde el backend
-                // LÍNEA CORREGIDA: Usa el nuevo LecturaRepository
                 val lecturas = lecturaRepo.getLecturas(sensorId)
 
                 if (lecturas.isEmpty()) {
                     Log.w(TAG, "⚠️ Sin lecturas para el sensor $sensorId, usando datos simulados.")
-                    // Se puede comentar mostrarGraficasPorDefecto() si quieres que no muestre nada
-                    // mostrarGraficasPorDefecto()
                     return@forEach
                 }
 
-                // Convertir lecturas en datos para las gráficas
                 val entries = lecturas.mapIndexed { index, lectura ->
-                    // Usa el valor del modelo LecturaResponse
                     Entry(index.toFloat(), lectura.valor.toFloat())
                 }
 
@@ -161,11 +296,7 @@ class SensorDataActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error al cargar datos del servidor", e)
             runOnUiThread {
-                Toast.makeText(
-                    this@SensorDataActivity,
-                    "Error al cargar gráficas: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this@SensorDataActivity, "Error al cargar gráficas: ${e.message}", Toast.LENGTH_LONG).show()
             }
             mostrarGraficasPorDefecto()
         }

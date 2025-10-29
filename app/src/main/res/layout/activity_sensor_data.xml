@@ -29,7 +29,7 @@
             android:id="@+id/main_scroll"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:layout_marginTop="@dimen/spacing_large"
+            android:layout_marginTop="@dimen/spacing_small"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -41,15 +41,6 @@
                 android:padding="@dimen/spacing_large">
 
                 <include
-                    android:id="@+id/card_lectura_voz"
-                    layout="@layout/include_card_switch"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-
-                <include
                     android:id="@+id/card_mq4"
                     layout="@layout/include_card_sensor_user"
                     android:layout_width="0dp"
@@ -57,8 +48,7 @@
                     android:layout_marginTop="@dimen/spacing_large"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/card_lectura_voz" />
-
+                    app:layout_constraintTop_toTopOf="parent" />
                 <include
                     android:id="@+id/card_temperatura"
                     layout="@layout/include_card_sensor_user"
@@ -82,5 +72,15 @@
             </androidx.constraintlayout.widget.ConstraintLayout>
         </androidx.core.widget.NestedScrollView>
     </androidx.constraintlayout.widget.ConstraintLayout>
-
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/nav_view"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:fitsSystemWindows="true"
+        android:background="@color/teal_deep"
+        app:itemIconTint="@color/white"
+        app:itemTextColor="@color/white"
+        app:itemBackground="@drawable/nav_item_background"
+        app:menu="@menu/nav_user_menu" />
 </androidx.drawerlayout.widget.DrawerLayout>
