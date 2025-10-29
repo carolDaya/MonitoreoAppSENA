@@ -30,9 +30,10 @@ class AlertsActivity : AppCompatActivity() {
         val textView = findViewById<TextView>(R.id.ia_response_text)
         textView.text = message
 
-        // 3. Botón OK que cierra la alerta
+        // 3. Botón OK que cierra la alerta (Botón de 'Continuar')
         val button = findViewById<MaterialButton>(R.id.button_message)
         button.setOnClickListener {
+            // Al presionar el botón, se cierra la alerta y regresa a SensorDataActivity
             finish()
         }
     }

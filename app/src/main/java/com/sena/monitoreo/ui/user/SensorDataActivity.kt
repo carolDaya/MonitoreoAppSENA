@@ -1,6 +1,7 @@
 package com.sena.monitoreo.ui.user
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -17,24 +18,36 @@ import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.PieChart
-import com.github.mikephil.charting.data.*
+import com.github.mikephil.charting.data.BarData
+import com.github.mikephil.charting.data.BarDataSet
+import com.github.mikephil.charting.data.BarEntry
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.data.PieData
+import com.github.mikephil.charting.data.PieDataSet
+import com.github.mikephil.charting.data.PieEntry
 import com.google.android.material.button.MaterialButton
 import com.masoudss.lib.WaveformSeekBar
 import com.sena.monitoreo.R
+import com.sena.monitoreo.data.repository.AnalisisRepository
 import com.sena.monitoreo.data.repository.GraficasRepository
 import com.sena.monitoreo.data.repository.LecturaRepository
 import com.sena.monitoreo.databinding.ActivitySensorDataBinding
-import com.sena.monitoreo.ui.auth.LoginActivity // Necesario para el Logout
+import com.sena.monitoreo.ui.auth.LoginActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.*
-import kotlin.random.Random // Necesario para el waveform simulado
+import kotlin.random.Random
 
 class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var binding: ActivitySensorDataBinding
     private val graficasRepo = GraficasRepository()
     private val lecturaRepo = LecturaRepository()
+    private val analisisRepo = AnalisisRepository()
     private val TAG = "SensorDataActivity"
     private val refreshTime = 5 * 60 * 1000L // 5 minutos
 
@@ -43,7 +56,11 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var isSpeaking = false
     private lateinit var waveformSeekBar: WaveformSeekBar
     private lateinit var btnPlay: MaterialButton
-    private val TTS_MESSAGE = "Hola" // MENSAJE HARCODEADO PARA PRUEBAS
+
+    // LÓGICA DE COOLDOWN DE ALERTA
+    private val PREFS_NAME = "AlertaPrefs"
+    private val KEY_LAST_ALERT_TIME = "last_alert_time"
+    private val ALERT_COOLDOWN_HOURS = 2L
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,17 +74,29 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         initWaveformViews()
 
         // 2. CONFIGURAR MENÚ LATERAL
-        binding.headerUser.settingsIcon.setOnClickListener { // headerUser es el ID del <include>
+        binding.headerUser.settingsIcon.setOnClickListener {
             binding.containerSensor.openDrawer(GravityCompat.START)
         }
         setupNavigationView()
 
-        // 3. INICIAR CARGA DE DATOS EN VIVO
+        // 3. LLAMADAS SUSPENDIDAS DENTRO DE CORRUTINAS
+
+        // A. Carga INICIAL de gráficas (inmediata)
+        lifecycleScope.launch {
+            cargarSensoresYGraficas()
+        }
+
+        // B. BUCLE de actualización de gráficas (cada 5 minutos)
         lifecycleScope.launch {
             while (true) {
-                cargarSensoresYGraficas()
                 delay(refreshTime)
+                cargarSensoresYGraficas()
             }
+        }
+
+        // C. VERIFICACIÓN INICIAL de alerta (se ejecuta al abrir la app)
+        lifecycleScope.launch {
+            checkAndHandleAlert()
         }
     }
 
@@ -105,12 +134,9 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun initWaveformViews() {
-        // Asumiendo que el include de header_layout_user tiene una sección con ID 'waveform_section'
         val waveformBinding = binding.headerUser.waveformSection
-
         waveformSeekBar = waveformBinding.waveformSeekBar
         btnPlay = waveformBinding.btnPlayMessage
-
         setupWaveformSamples()
 
         btnPlay.setOnClickListener {
@@ -119,20 +145,36 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun setupWaveformSamples() {
-        // Crear datos de muestra (harcodeados) para el waveform
-        val samples = IntArray(100) {
-            Random.nextInt(10, 100) // Valores aleatorios entre 10 y 100
-        }
+        val samples = IntArray(100) { Random.nextInt(10, 100) }
         waveformSeekBar.setSampleFrom(samples)
         waveformSeekBar.progress = 0f
     }
 
     private fun startSpeaking() {
-        // USANDO EL MENSAJE HARCODEADO
-        speakText(TTS_MESSAGE)
+        if (tts?.isSpeaking == true) {
+            stopSpeaking()
+            return
+        }
+
         isSpeaking = true
         btnPlay.setIconResource(R.drawable.ic_stop)
-        startWaveformAnimation()
+
+        lifecycleScope.launch {
+            val analisis = analisisRepo.analizarLectura()
+
+            if (analisis != null) {
+                // 🔊 REPRODUCE EL MENSAJE SIN IMPORTAR SI HAY ALERTA O NO
+                speakText(analisis.mensaje_lectura)
+                startWaveformAnimation(analisis.mensaje_lectura.length)
+
+                Log.d(TAG, "🔊 Reproduciendo mensaje: ${analisis.mensaje_lectura}")
+            } else {
+                runOnUiThread {
+                    Toast.makeText(this@SensorDataActivity, "Error al obtener análisis de la IA.", Toast.LENGTH_SHORT).show()
+                }
+                stopSpeaking()
+            }
+        }
     }
 
     private fun stopSpeaking() {
@@ -142,30 +184,28 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         waveformSeekBar.progress = 0f
     }
 
-    private fun startWaveformAnimation() {
+    private fun startWaveformAnimation(textLength: Int) {
         lifecycleScope.launch {
-            val duration = 3000L // Duración estimada de "Hola"
-            val steps = duration / 50L
+            val estimatedDurationMs = (textLength * 80).toLong().coerceAtLeast(3000L)
+            val steps = estimatedDurationMs / 50L
             val progressStep = waveformSeekBar.maxProgress / steps.toFloat()
 
             for (i in 0 until steps.toInt()) {
                 if (!isSpeaking) break
 
-                // 1. Actualizar progreso
                 waveformSeekBar.progress += progressStep
 
-                // 2. Simular movimiento de ondas (cambiando los samples dinámicamente)
-                val dynamicSamples = IntArray(100) {
-                    Random.nextInt(5, 95)
-                }
+                val dynamicSamples = IntArray(100) { Random.nextInt(5, 95) }
                 waveformSeekBar.setSampleFrom(dynamicSamples)
 
                 delay(50L)
             }
-
-            // Cuando termina la simulación o el TTS deja de hablar
             stopSpeaking()
         }
+    }
+
+    private fun speakText(text: String) {
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "TTS_ID")
     }
 
     override fun onInit(status: Int) {
@@ -183,10 +223,6 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun speakText(text: String) {
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "TTS_ID")
-    }
-
     override fun onBackPressed() {
         if (binding.containerSensor.isDrawerOpen(GravityCompat.START)) {
             binding.containerSensor.closeDrawer(GravityCompat.START)
@@ -202,43 +238,51 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     // ---------------------------------------------------------------------
-    //                       FUNCIONES DE COLORES (EXISTENTES)
+    //                         LÓGICA DE ALERTA INICIAL
     // ---------------------------------------------------------------------
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun getSensorColor(sensorId: Int): Int {
-        return when (sensorId) {
-            2 -> resources.getColor(R.color.temp_color, null)
-            3 -> resources.getColor(R.color.pressure_color, null)
-            1 -> resources.getColor(R.color.gas_color, null)
-            else -> Color.BLACK
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private suspend fun checkAndHandleAlert() {
+        val prefs: SharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val lastAlertTimeMillis = prefs.getLong(KEY_LAST_ALERT_TIME, 0L)
+
+        val lastAlertTime = Instant.ofEpochMilli(lastAlertTimeMillis)
+        val currentTime = Instant.now()
+        val hoursSinceLastAlert = ChronoUnit.HOURS.between(lastAlertTime, currentTime)
+
+        val shouldCheck = lastAlertTimeMillis == 0L || hoursSinceLastAlert >= ALERT_COOLDOWN_HOURS
+
+        if (shouldCheck) {
+            Log.d(TAG, "Verificando alerta de IA (cooldown expirado o primer ingreso)...")
+
+            val analisis = analisisRepo.analizarLectura()
+
+            if (analisis != null) {
+                if (analisis.alerta_ia == 1) {
+                    mostrarAlerta(analisis.mensaje_lectura)
+                    prefs.edit().putLong(KEY_LAST_ALERT_TIME, currentTime.toEpochMilli()).apply()
+                } else {
+                    Log.d(TAG, "Sistema Normal. Mensaje: ${analisis.mensaje_lectura}")
+                }
+            } else {
+                Log.w(TAG, "No se pudo obtener el análisis de la IA.")
+            }
+        } else {
+            Log.d(TAG, "Alerta omitida. Cooldown activo ($hoursSinceLastAlert horas transcurridas).")
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun getPieChartColors(sensorId: Int): List<Int> {
-        return when (sensorId) {
-            2 -> listOf(
-                resources.getColor(R.color.temp_color_light, null),
-                resources.getColor(R.color.temp_color, null),
-                resources.getColor(R.color.temp_color_dark, null)
-            )
-            3 -> listOf(
-                resources.getColor(R.color.pressure_color_light, null),
-                resources.getColor(R.color.pressure_color, null),
-                resources.getColor(R.color.pressure_color_dark, null)
-            )
-            1 -> listOf(
-                resources.getColor(R.color.gas_color_light, null),
-                resources.getColor(R.color.gas_color, null),
-                resources.getColor(R.color.gas_color_dark, null)
-            )
-            else -> listOf(Color.GRAY, Color.DKGRAY, Color.BLACK)
+    private fun mostrarAlerta(mensaje: String) {
+        val intent = Intent(this, AlertsActivity::class.java).apply {
+            putExtra("alert_message", mensaje)
         }
+        startActivity(intent)
     }
 
     // ---------------------------------------------------------------------
-    //                    CARGA DE CONFIGURACIONES Y LECTURAS
+    //                    CARGA DE GRÁFICAS COMPLETA
     // ---------------------------------------------------------------------
+
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun cargarSensoresYGraficas() {
         try {
@@ -302,9 +346,38 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    // ---------------------------------------------------------------------
-    //                  GRÁFICAS POR DEFECTO (EXISTENTES)
-    // ---------------------------------------------------------------------
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun getSensorColor(sensorId: Int): Int {
+        return when (sensorId) {
+            2 -> resources.getColor(R.color.temp_color, null)
+            3 -> resources.getColor(R.color.pressure_color, null)
+            1 -> resources.getColor(R.color.gas_color, null)
+            else -> Color.BLACK
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun getPieChartColors(sensorId: Int): List<Int> {
+        return when (sensorId) {
+            2 -> listOf(
+                resources.getColor(R.color.temp_color_light, null),
+                resources.getColor(R.color.temp_color, null),
+                resources.getColor(R.color.temp_color_dark, null)
+            )
+            3 -> listOf(
+                resources.getColor(R.color.pressure_color_light, null),
+                resources.getColor(R.color.pressure_color, null),
+                resources.getColor(R.color.pressure_color_dark, null)
+            )
+            1 -> listOf(
+                resources.getColor(R.color.gas_color_light, null),
+                resources.getColor(R.color.gas_color, null),
+                resources.getColor(R.color.gas_color_dark, null)
+            )
+            else -> listOf(Color.GRAY, Color.DKGRAY, Color.BLACK)
+        }
+    }
+
     private fun mostrarGraficasPorDefecto() {
         val entriesTemp = listOf(Entry(1f, 25f), Entry(2f, 26f), Entry(3f, 28f))
         val entriesPresion = listOf(Entry(1f, 990f), Entry(2f, 1000f), Entry(3f, 1010f))
@@ -314,9 +387,7 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         mostrarGrafica("bar", binding.cardPresion.root, "Presión", Color.GREEN, entriesPresion, 3)
         mostrarGrafica("pie", binding.cardMq4.root, "Metano", Color.RED, entriesMetano, 1)
     }
-    // ---------------------------------------------------------------------
-    //                        CONFIGURACIÓN DE GRÁFICAS (EXISTENTES)
-    // ---------------------------------------------------------------------
+
     private fun mostrarGrafica(
         tipo: String,
         cardView: View,
