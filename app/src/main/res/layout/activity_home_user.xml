@@ -3,13 +3,12 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/drawer_layout"
+    android:id="@+id/home_admin"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:openDrawer="start"
     android:fitsSystemWindows="true"
     tools:context=".ui.user.HomeUserActivity">
-
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/main_content"
         android:layout_width="match_parent"
@@ -17,7 +16,7 @@
         android:background="@color/gray_300">
 
         <include
-            android:id="@+id/main_header_user"
+            android:id="@+id/main_header"
             layout="@layout/header_layout_user"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -34,7 +33,7 @@
             app:layout_constraintDimensionRatio="16:9"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/main_header_user"
+            app:layout_constraintTop_toBottomOf="@id/main_header"
             app:lottie_autoPlay="true"
             app:lottie_loop="true"
             app:lottie_rawRes="@raw/anim_greetings_robot"
