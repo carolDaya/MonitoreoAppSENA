@@ -61,9 +61,9 @@ class SensorDataActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.M)
     private fun getSensorColor(sensorId: Int): Int {
         return when (sensorId) {
-            1 -> resources.getColor(R.color.temp_color, null)
-            2 -> resources.getColor(R.color.pressure_color, null)
-            3 -> resources.getColor(R.color.gas_color, null)
+            2 -> resources.getColor(R.color.temp_color, null)
+            3 -> resources.getColor(R.color.pressure_color, null)
+            1 -> resources.getColor(R.color.gas_color, null)
             else -> Color.BLACK
         }
     }
@@ -71,17 +71,17 @@ class SensorDataActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.M)
     private fun getPieChartColors(sensorId: Int): List<Int> {
         return when (sensorId) {
-            1 -> listOf(
+            2 -> listOf(
                 resources.getColor(R.color.temp_color_light, null),
                 resources.getColor(R.color.temp_color, null),
                 resources.getColor(R.color.temp_color_dark, null)
             )
-            2 -> listOf(
+            3 -> listOf(
                 resources.getColor(R.color.pressure_color_light, null),
                 resources.getColor(R.color.pressure_color, null),
                 resources.getColor(R.color.pressure_color_dark, null)
             )
-            3 -> listOf(
+            1 -> listOf(
                 resources.getColor(R.color.gas_color_light, null),
                 resources.getColor(R.color.gas_color, null),
                 resources.getColor(R.color.gas_color_dark, null)
@@ -130,9 +130,9 @@ class SensorDataActivity : AppCompatActivity() {
                 }
 
                 val (nombreSensor, cardView) = when (sensorId) {
-                    1 -> Pair("Temperatura", binding.cardTemperatura.root)
-                    2 -> Pair("Presión", binding.cardPresion.root)
-                    3 -> Pair("Metano", binding.cardMq4.root)
+                    2 -> Pair("Temperatura", binding.cardTemperatura.root)
+                    3 -> Pair("Presión", binding.cardPresion.root)
+                    1 -> Pair("Metano", binding.cardMq4.root)
                     else -> return@forEach
                 }
 
@@ -179,11 +179,10 @@ class SensorDataActivity : AppCompatActivity() {
         val entriesPresion = listOf(Entry(1f, 990f), Entry(2f, 1000f), Entry(3f, 1010f))
         val entriesMetano = listOf(Entry(1f, 0.05f), Entry(2f, 0.06f), Entry(3f, 0.07f))
 
-        mostrarGrafica("line", binding.cardTemperatura.root, "Temperatura", Color.BLUE, entriesTemp, 1)
-        mostrarGrafica("bar", binding.cardPresion.root, "Presión", Color.GREEN, entriesPresion, 2)
-        mostrarGrafica("pie", binding.cardMq4.root, "Metano", Color.RED, entriesMetano, 3)
+        mostrarGrafica("line", binding.cardTemperatura.root, "Temperatura", Color.BLUE, entriesTemp, 2)
+        mostrarGrafica("bar", binding.cardPresion.root, "Presión", Color.GREEN, entriesPresion, 3)
+        mostrarGrafica("pie", binding.cardMq4.root, "Metano", Color.RED, entriesMetano, 1)
     }
-
     // ---------------------------------------------------------------------
     //                        CONFIGURACIÓN DE GRÁFICAS (EXISTENTES)
     // ---------------------------------------------------------------------

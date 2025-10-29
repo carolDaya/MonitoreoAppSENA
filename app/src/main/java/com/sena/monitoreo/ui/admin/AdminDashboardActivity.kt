@@ -234,8 +234,9 @@ class AdminDashboardActivity : AppCompatActivity() {
         dialog.show()
     }
 
+
     // ----------------------------------------------------------
-    // 🔹 Carga de configuraciones de gráficas desde backend
+    // Cargar configuraciones de gráficas desde backend
     // ----------------------------------------------------------
     @RequiresApi(Build.VERSION_CODES.M)
     private fun cargarGraficasGuardadas() {
@@ -255,21 +256,21 @@ class AdminDashboardActivity : AppCompatActivity() {
                     val sensorId = config.sensor_id
 
                     when (sensorId) {
-                        1 -> updateChart(
+                        2 -> updateChart(
                             binding.graficasAdminSection.graphContainerTemp,
                             tipo,
                             "Temperatura",
                             binding.graficasAdminSection.btnChangeTemp,
                             sensorId
                         )
-                        2 -> updateChart(
+                        3 -> updateChart(
                             binding.graficasAdminSection.graphContainerPressure,
                             tipo,
                             "Presión",
                             binding.graficasAdminSection.btnChangePressure,
                             sensorId
                         )
-                        3 -> updateChart(
+                        1 -> updateChart(
                             binding.graficasAdminSection.graphContainerGas,
                             tipo,
                             "Metano",
@@ -295,10 +296,11 @@ class AdminDashboardActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.M)
     private fun setupChartsDefault() {
         Log.d(TAG, "📊 Configurando gráficas por defecto (línea)")
-        updateChart(binding.graficasAdminSection.graphContainerTemp, "line", "Temperatura", binding.graficasAdminSection.btnChangeTemp, 1)
-        updateChart(binding.graficasAdminSection.graphContainerPressure, "line", "Presión", binding.graficasAdminSection.btnChangePressure, 2)
-        updateChart(binding.graficasAdminSection.graphContainerGas, "line", "Metano", binding.graficasAdminSection.btnChangeGas, 3)
+        updateChart(binding.graficasAdminSection.graphContainerTemp, "line", "Temperatura", binding.graficasAdminSection.btnChangeTemp, 2)
+        updateChart(binding.graficasAdminSection.graphContainerPressure, "line", "Presión", binding.graficasAdminSection.btnChangePressure, 3)
+        updateChart(binding.graficasAdminSection.graphContainerGas, "line", "Metano", binding.graficasAdminSection.btnChangeGas, 1)
     }
+
 
     // ----------------------------------------------------------
     // Botones para cambiar tipo de gráfica
@@ -306,13 +308,13 @@ class AdminDashboardActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.M)
     private fun setupChartClickListeners() {
         binding.graficasAdminSection.btnChangeTemp.setOnClickListener {
-            showGraphTypeDialog("Temperatura", binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp, 1)
+            showGraphTypeDialog("Temperatura", binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp, 2)
         }
         binding.graficasAdminSection.btnChangePressure.setOnClickListener {
-            showGraphTypeDialog("Presión", binding.graficasAdminSection.graphContainerPressure, binding.graficasAdminSection.btnChangePressure, 2)
+            showGraphTypeDialog("Presión", binding.graficasAdminSection.graphContainerPressure, binding.graficasAdminSection.btnChangePressure, 3)
         }
         binding.graficasAdminSection.btnChangeGas.setOnClickListener {
-            showGraphTypeDialog("Metano", binding.graficasAdminSection.graphContainerGas, binding.graficasAdminSection.btnChangeGas, 3)
+            showGraphTypeDialog("Metano", binding.graficasAdminSection.graphContainerGas, binding.graficasAdminSection.btnChangeGas, 1)
         }
     }
 
