@@ -14,6 +14,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.LineChart
@@ -30,11 +31,16 @@ import com.github.mikephil.charting.data.PieEntry
 import com.google.android.material.button.MaterialButton
 import com.masoudss.lib.WaveformSeekBar
 import com.sena.monitoreo.R
+import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.repository.AnalisisRepository
 import com.sena.monitoreo.data.repository.GraficasRepository
 import com.sena.monitoreo.data.repository.LecturaRepository
+import com.sena.monitoreo.data.repository.VoiceRepository
 import com.sena.monitoreo.databinding.ActivitySensorDataBinding
 import com.sena.monitoreo.ui.auth.LoginActivity
+import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModel
+import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModelFactory
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -53,6 +59,7 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     // PROPIEDADES PARA VOZ Y ONDAS
     private var tts: TextToSpeech? = null
+    private var ttsReady = false
     private var isSpeaking = false
     private lateinit var waveformSeekBar: WaveformSeekBar
     private lateinit var btnPlay: MaterialButton
@@ -61,6 +68,23 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val PREFS_NAME = "AlertaPrefs"
     private val KEY_LAST_ALERT_TIME = "last_alert_time"
     private val ALERT_COOLDOWN_HOURS = 2L
+    private val ALERT_CHECK_INTERVAL = 10 * 60 * 1000L // Verificar cada 10 minutos
+
+    // 🆕 Variable para controlar el bucle de alertas
+    private var alertCheckJob: Job? = null
+
+    // PROPIEDADES DE CONFIGURACIÓN DE VOZ
+    private var currentPitch: Float = 1.0f
+    private var currentGender: String = "FEMALE"
+    private val preferredMaleVoices = listOf("male", "hombre", "masculino", "man", "mfb")
+    private val preferredFemaleVoices = listOf("female", "mujer", "femenino", "woman", "efb")
+
+    // ViewModel para configuración de voz
+    private val viewModel: AdminConfigViewModel by lazy {
+        val repository = VoiceRepository(RetrofitClient.apiVoice)
+        ViewModelProvider(this, AdminConfigViewModelFactory(repository))
+            .get(AdminConfigViewModel::class.java)
+    }
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,6 +96,7 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // 1. INICIALIZAR VOZ/ONDAS
         tts = TextToSpeech(this, this)
         initWaveformViews()
+        loadVoiceConfiguration()
 
         // 2. CONFIGURAR MENÚ LATERAL
         binding.headerUser.settingsIcon.setOnClickListener {
@@ -80,7 +105,6 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         setupNavigationView()
 
         // 3. LLAMADAS SUSPENDIDAS DENTRO DE CORRUTINAS
-
         // A. Carga INICIAL de gráficas (inmediata)
         lifecycleScope.launch {
             cargarSensoresYGraficas()
@@ -98,11 +122,144 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         lifecycleScope.launch {
             checkAndHandleAlert()
         }
+
+        // 🆕 D. VERIFICACIÓN PERIÓDICA de alertas (cada 10 minutos)
+        startPeriodicAlertCheck()
+
+        // 🧪 E. BOTÓN DE PRUEBA (solo para desarrollo, eliminar en producción)
+        setupTestAlertButton()
+    }
+
+    // 🆕 Inicia el bucle de verificación periódica
+    private fun startPeriodicAlertCheck() {
+        alertCheckJob = lifecycleScope.launch {
+            while (true) {
+                delay(ALERT_CHECK_INTERVAL) // Espera 10 minutos
+                Log.d(TAG, "🔄 Verificación periódica de alertas...")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    checkAndHandleAlert()
+                }
+            }
+        }
+    }
+
+    // 🧪 BOTÓN DE PRUEBA - Eliminar en producción
+    private fun setupTestAlertButton() {
+        // Usar el botón de waveform con long click (más discreto)
+        btnPlay.setOnLongClickListener {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("🧪 Modo Desarrollo")
+                .setMessage("¿Forzar verificación de alerta?")
+                .setPositiveButton("Sí") { _, _ ->
+                    // Borrar el cooldown
+                    val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    prefs.edit().clear().apply()
+
+                    // Verificar inmediatamente
+                    lifecycleScope.launch {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            Log.d(TAG, "🧪 TEST: Verificación forzada de alerta")
+                            checkAndHandleAlert()
+                        }
+                    }
+                    Toast.makeText(this, "Cooldown reseteado. Verificando...", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+            true
+        }
     }
 
     // ---------------------------------------------------------------------
-    //                       IMPLEMENTACIÓN DE VOZ Y MENÚ
+    //                      LÓGICA DE VOZ (ADAPTADA)
     // ---------------------------------------------------------------------
+
+    private fun loadVoiceConfiguration() {
+        viewModel.loadCurrentConfig()
+
+        viewModel.currentConfig.observe(this) { config ->
+            currentPitch = config.pitch
+            currentGender = config.gender
+
+            if (ttsReady) {
+                applyTtsSettings()
+            }
+        }
+    }
+
+    private fun applyTtsSettings() {
+        if (tts == null || !ttsReady) return
+
+        val locale = Locale("es", "ES")
+        val result = tts?.setLanguage(locale)
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Log.e(TAG, "Idioma de TTS no compatible. Instale voces en español")
+            btnPlay.isEnabled = false
+            return
+        }
+
+        when (currentGender.uppercase()) {
+            "MALE" -> setupMaleVoice(locale)
+            "FEMALE" -> setupFemaleVoice(locale)
+            "ROBOTIC" -> setupRoboticVoice()
+            else -> setupFemaleVoice(locale)
+        }
+
+        tts?.setPitch(mapPitchValue(currentPitch))
+        btnPlay.isEnabled = true
+    }
+
+    private fun setupMaleVoice(locale: Locale) {
+        tts?.voices?.find {
+            it.locale.language == "es" &&
+                    preferredMaleVoices.any { pref -> it.name.contains(pref, true) }
+        }?.let {
+            tts?.voice = it
+            return
+        }
+        tts?.setPitch(0.8f)
+        tts?.setSpeechRate(0.9f)
+    }
+
+    private fun setupFemaleVoice(locale: Locale) {
+        tts?.voices?.find {
+            it.locale.language == "es" &&
+                    preferredFemaleVoices.any { pref -> it.name.contains(pref, true) }
+        }?.let {
+            tts?.voice = it
+            return
+        }
+        tts?.setPitch(1.1f)
+        tts?.setSpeechRate(1.0f)
+    }
+
+    private fun setupRoboticVoice() {
+        val locale = Locale("es", "ES")
+        tts?.voices?.find { it.locale.language == "es" }?.let {
+            tts?.voice = it
+        }
+        tts?.setPitch(0.3f)
+        tts?.setSpeechRate(0.75f)
+    }
+
+    private fun mapPitchValue(value: Float): Float {
+        return when (value) {
+            0.8f -> 0.6f
+            1.0f -> 1.0f
+            1.3f -> 1.6f
+            else -> value.coerceIn(0.5f, 2.0f)
+        }
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            ttsReady = true
+            applyTtsSettings()
+        } else {
+            Log.e(TAG, "Error con TextToSpeech: $status")
+            btnPlay.isEnabled = false
+        }
+    }
 
     private fun setupNavigationView() {
         binding.navView.setNavigationItemSelectedListener { item ->
@@ -163,7 +320,6 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val analisis = analisisRepo.analizarLectura()
 
             if (analisis != null) {
-                // 🔊 REPRODUCE EL MENSAJE SIN IMPORTAR SI HAY ALERTA O NO
                 speakText(analisis.mensaje_lectura)
                 startWaveformAnimation(analisis.mensaje_lectura.length)
 
@@ -208,21 +364,6 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "TTS_ID")
     }
 
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale("es", "ES"))
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                Log.e(TAG, "Idioma de TTS no compatible")
-                btnPlay.isEnabled = false
-            } else {
-                btnPlay.isEnabled = true
-            }
-        } else {
-            Log.e(TAG, "Error con TextToSpeech: $status")
-            btnPlay.isEnabled = false
-        }
-    }
-
     override fun onBackPressed() {
         if (binding.containerSensor.isDrawerOpen(GravityCompat.START)) {
             binding.containerSensor.closeDrawer(GravityCompat.START)
@@ -235,6 +376,7 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onDestroy()
         tts?.stop()
         tts?.shutdown()
+        alertCheckJob?.cancel() // 🆕 Cancelar el bucle de alertas
     }
 
     // ---------------------------------------------------------------------
@@ -252,23 +394,45 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         val shouldCheck = lastAlertTimeMillis == 0L || hoursSinceLastAlert >= ALERT_COOLDOWN_HOURS
 
+        Log.d(TAG, """
+            📊 Estado de Alertas:
+            - Última alerta: ${if (lastAlertTimeMillis == 0L) "Nunca" else lastAlertTime}
+            - Tiempo transcurrido: $hoursSinceLastAlert horas
+            - Cooldown: $ALERT_COOLDOWN_HOURS horas
+            - ¿Debe verificar?: $shouldCheck
+        """.trimIndent())
+
         if (shouldCheck) {
-            Log.d(TAG, "Verificando alerta de IA (cooldown expirado o primer ingreso)...")
+            Log.d(TAG, "✅ Consultando backend para análisis...")
 
             val analisis = analisisRepo.analizarLectura()
 
             if (analisis != null) {
+                Log.d(TAG, """
+                    📡 Respuesta del backend:
+                    - alerta_ia: ${analisis.alerta_ia}
+                    - mensaje: ${analisis.mensaje_lectura}
+                """.trimIndent())
+
                 if (analisis.alerta_ia == 1) {
+                    Log.d(TAG, "🚨 ¡ALERTA DETECTADA! Mostrando AlertsActivity...")
                     mostrarAlerta(analisis.mensaje_lectura)
                     prefs.edit().putLong(KEY_LAST_ALERT_TIME, currentTime.toEpochMilli()).apply()
+
+                    runOnUiThread {
+                        Toast.makeText(this@SensorDataActivity, "⚠️ Nueva alerta detectada", Toast.LENGTH_SHORT).show()
+                    }
                 } else {
-                    Log.d(TAG, "Sistema Normal. Mensaje: ${analisis.mensaje_lectura}")
+                    Log.d(TAG, "✅ Sistema normal. Sin alertas activas.")
                 }
             } else {
-                Log.w(TAG, "No se pudo obtener el análisis de la IA.")
+                Log.e(TAG, "❌ Error: No se pudo obtener respuesta del backend")
+                runOnUiThread {
+                    Toast.makeText(this@SensorDataActivity, "Error al verificar alertas", Toast.LENGTH_SHORT).show()
+                }
             }
         } else {
-            Log.d(TAG, "Alerta omitida. Cooldown activo ($hoursSinceLastAlert horas transcurridas).")
+            Log.d(TAG, "⏸️ Cooldown activo. Faltan ${ALERT_COOLDOWN_HOURS - hoursSinceLastAlert} horas.")
         }
     }
 

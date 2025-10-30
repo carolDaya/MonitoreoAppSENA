@@ -8,7 +8,7 @@
     android:paddingEnd="@dimen/spacing_medium"
     android:paddingTop="@dimen/spacing_small"
     android:paddingBottom="@dimen/spacing_small"
-    android:background="@drawable/background_waveform"
+    android:background="@android:color/transparent"
     android:layout_margin="@dimen/spacing_medium">
 
     <com.masoudss.lib.WaveformSeekBar

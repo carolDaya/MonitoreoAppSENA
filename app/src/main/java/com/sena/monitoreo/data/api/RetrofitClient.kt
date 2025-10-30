@@ -51,4 +51,7 @@ object RetrofitClient {
     val apiAi: ApiAiService by lazy {
         retrofitApi.create(ApiAiService::class.java)
     }
+    val apiVoice: ApiVoice by lazy {
+        retrofitApi.create(ApiVoice::class.java)
+    }
 }

@@ -160,4 +160,5 @@
     <string name="estado_sensor">Estado del sensor</string>
     <string name="estado_usuario">estado</string>
     <string name="greeting_text">Hola Bienvenido a BMIS</string>
+    <string name="action_save_voice_config">Guardar</string>
 </resources>
