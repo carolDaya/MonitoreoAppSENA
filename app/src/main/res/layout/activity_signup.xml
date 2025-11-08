@@ -21,7 +21,7 @@
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/top_green_section"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/height_section_top"
+                android:layout_height="@dimen/section_top_height"
                 android:background="@drawable/dialog_bg_signup"
                 android:paddingBottom="@dimen/spacing_xxxxlarge"
                 app:layout_constraintEnd_toEndOf="parent"

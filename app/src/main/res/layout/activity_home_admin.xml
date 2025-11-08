@@ -25,36 +25,18 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <com.airbnb.lottie.LottieAnimationView
-            android:id="@+id/animation_view"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_marginTop="@dimen/spacing_medium"
-            android:importantForAccessibility="no"
-            app:layout_constraintDimensionRatio="16:9"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/main_header"
-            app:lottie_autoPlay="true"
-            app:lottie_loop="true"
-            app:lottie_rawRes="@raw/anim_greetings_robot"
-            tools:ignore="MissingConstraints,VisualLintBounds" />
-
-        <TextView
-            android:id="@+id/welcome_message"
-            style="@style/TextAppearance.Montserrat.WelcomeMessage"
+        <include
+            android:id="@+id/card_proceso_control_include"
+            layout="@layout/card_proceso_control"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/spacing_medium"
-            android:padding="@dimen/spacing_medium"
-            android:text="@string/welcome_message"
-            android:importantForAccessibility="yes"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/main_header"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/animation_view"
-            app:layout_constraintWidth_percent="0.9"
-            tools:ignore="MissingConstraints,VisualLintBounds" />
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+
     </androidx.constraintlayout.widget.ConstraintLayout>
+
 
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
@@ -67,4 +49,6 @@
         app:itemTextColor="@color/white"
         app:itemBackground="@drawable/nav_item_background"
         app:menu="@menu/nav_admin_menu" />
+
+
 </androidx.drawerlayout.widget.DrawerLayout>

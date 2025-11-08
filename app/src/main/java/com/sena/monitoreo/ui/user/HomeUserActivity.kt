@@ -181,7 +181,7 @@ class HomeUserActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun startSpeaking() {
-        val message = getString(R.string.greeting_text)
+        val message = getString(R.string.welcome_message)
         speakText(message)
         isSpeaking = true
         btnPlay.setIconResource(R.drawable.ic_stop)

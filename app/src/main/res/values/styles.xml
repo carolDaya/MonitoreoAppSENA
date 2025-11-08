@@ -4,14 +4,15 @@
     <!-- ALERTAS -->
     <style name="TextAppearance.AlertaTitle" parent="TextAppearance.AppCompat.Headline">
         <item name="android:textSize">@dimen/text_size_xxxxxxl</item>
-        <item name="android:textColor">@android:color/black</item>
+        <item name="android:textColor">@color/black</item>
         <item name="android:textStyle">bold</item>
-        <item name="fontFamily">@font/montserrat_extrabold</item>
+        <item name="android:fontFamily">@font/montserrat_extrabold</item>
     </style>
+
     <style name="TextAppearance.AlertaBody" parent="TextAppearance.AppCompat.Body1">
         <item name="android:textSize">@dimen/text_size_m</item>
-        <item name="android:textColor">@android:color/black</item>
-        <item name="fontFamily">@font/montserrat</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:fontFamily">@font/montserrat</item>
     </style>
 
     <!-- TEXTINPUTS -->
@@ -31,7 +32,7 @@
         <item name="android:paddingStart">@dimen/spacing_medium</item>
         <item name="android:paddingEnd">@dimen/spacing_medium</item>
         <item name="android:drawablePadding">@dimen/spacing_sm</item>
-        <item name="boxStrokeColor">@color/green_icon</item>
+        <!-- ⚠️ Eliminado boxStrokeColor (no aplica a EditText) -->
     </style>
 
     <style name="Widget.App.TextInputEditText.CustomBackground" parent="">
@@ -77,24 +78,28 @@
         <item name="android:textSize">@dimen/text_size_xxxxxxl</item>
         <item name="android:textColor">@color/teal_deep</item>
         <item name="android:textStyle">bold</item>
-        <item name="fontFamily">@font/montserrat_extrabold</item>
+        <item name="android:fontFamily">@font/montserrat_extrabold</item>
     </style>
+
     <style name="TextAppearance.Montserrat.Body" parent="TextAppearance.AppCompat.Body1">
         <item name="android:textSize">@dimen/text_size_m</item>
         <item name="android:textColor">@color/gray_900</item>
-        <item name="fontFamily">@font/montserrat</item>
+        <item name="android:fontFamily">@font/montserrat</item>
     </style>
+
     <style name="TextAppearance.Montserrat.Body.White" parent="TextAppearance.Montserrat.Body">
         <item name="android:textColor">@color/white</item>
     </style>
+
     <style name="TextAppearance.Montserrat.WelcomeMessage" parent="TextAppearance.Montserrat.Body">
         <item name="android:textSize">@dimen/text_size_l</item>
         <item name="android:textColor">?attr/colorOnBackground</item>
-        <item name="fontFamily">@font/montserrat</item>
+        <item name="android:fontFamily">@font/montserrat</item>
         <item name="android:gravity">center</item>
     </style>
+
     <style name="TextAppearance.Montserrat.Title.White" parent="TextAppearance.Montserrat.Title">
-        <item name="android:textColor">@android:color/white</item>
+        <item name="android:textColor">@color/white</item>
     </style>
 
     <!-- INPUT PASSWORD -->
@@ -108,10 +113,7 @@
         <item name="android:textColorHint">@color/gray_500</item>
         <item name="android:textSize">@dimen/text_size_lg</item>
         <item name="android:inputType">textPassword</item>
-        <item name="android:layout_width">0dp</item>
-        <item name="layout_constraintWidth_percent">0.85</item>
-        <item name="layout_constraintStart_toStartOf">parent</item>
-        <item name="layout_constraintEnd_toEndOf">parent</item>
+        <!-- ⚠️ Eliminado constraintWidth_percent (solo se usa en layouts Constraint) -->
     </style>
 
     <!-- BOTONES -->
@@ -132,10 +134,7 @@
         <item name="android:paddingTop">@dimen/spacing_s</item>
         <item name="android:paddingBottom">@dimen/spacing_s</item>
         <item name="cornerRadius">@dimen/spacing_s</item>
-        <item name="android:layout_width">0dp</item>
-        <item name="layout_constraintWidth_percent">0.85</item>
-        <item name="layout_constraintStart_toStartOf">parent</item>
-        <item name="layout_constraintEnd_toEndOf">parent</item>
+        <!-- ⚠️ Eliminado constraintWidth_percent (solo en layouts) -->
     </style>
 
     <!-- CARDS -->

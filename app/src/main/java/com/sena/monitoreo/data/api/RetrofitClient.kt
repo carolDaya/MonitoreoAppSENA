@@ -43,6 +43,10 @@ object RetrofitClient {
         retrofitApi.create(ApiLectura::class.java)
     }
 
+    val apiProceso: ApiProceso by lazy {
+        retrofitApi.create(ApiProceso::class.java)
+    }
+
     // Cliente para USUARIOS
     val apiUser: ApiUser by lazy {
         retrofitApi.create(ApiUser::class.java)

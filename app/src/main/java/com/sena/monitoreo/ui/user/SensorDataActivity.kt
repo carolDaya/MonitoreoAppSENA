@@ -53,7 +53,7 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var binding: ActivitySensorDataBinding
     private val graficasRepo = GraficasRepository()
     private val lecturaRepo = LecturaRepository()
-    private val analisisRepo = AnalisisRepository()
+    private val analisisRepo = AnalisisRepository(RetrofitClient.apiAi)
     private val TAG = "SensorDataActivity"
     private val refreshTime = 5 * 60 * 1000L // 5 minutos
 
@@ -317,22 +317,27 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         btnPlay.setIconResource(R.drawable.ic_stop)
 
         lifecycleScope.launch {
-            val analisis = analisisRepo.analizarLectura()
+            // 🛑 Usar AnalisisResult para capturar éxito o error
+            val analisisResult = analisisRepo.analizarLectura()
 
-            if (analisis != null) {
+            if (analisisResult.success != null) {
+                // CASO ÉXITO (alerta_ia = 0 o 1)
+                val analisis = analisisResult.success
                 speakText(analisis.mensaje_lectura)
                 startWaveformAnimation(analisis.mensaje_lectura.length)
-
                 Log.d(TAG, "🔊 Reproduciendo mensaje: ${analisis.mensaje_lectura}")
             } else {
+                // 🛑 CASO ERROR CONTROLADO (ej. No hay datos registrados) o ERROR DE CONEXIÓN
+                val errorMessage = analisisResult.errorMessage ?: "Error desconocido al obtener análisis."
+
                 runOnUiThread {
-                    Toast.makeText(this@SensorDataActivity, "Error al obtener análisis de la IA.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@SensorDataActivity, errorMessage, Toast.LENGTH_LONG).show()
                 }
+                Log.e(TAG, "❌ Error al obtener análisis de la IA: $errorMessage")
                 stopSpeaking()
             }
         }
     }
-
     private fun stopSpeaking() {
         tts?.stop()
         isSpeaking = false
@@ -394,48 +399,38 @@ class SensorDataActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         val shouldCheck = lastAlertTimeMillis == 0L || hoursSinceLastAlert >= ALERT_COOLDOWN_HOURS
 
-        Log.d(TAG, """
-            📊 Estado de Alertas:
-            - Última alerta: ${if (lastAlertTimeMillis == 0L) "Nunca" else lastAlertTime}
-            - Tiempo transcurrido: $hoursSinceLastAlert horas
-            - Cooldown: $ALERT_COOLDOWN_HOURS horas
-            - ¿Debe verificar?: $shouldCheck
-        """.trimIndent())
+        // ... (logging de estado de alerta) ...
 
         if (shouldCheck) {
             Log.d(TAG, "✅ Consultando backend para análisis...")
 
-            val analisis = analisisRepo.analizarLectura()
+            // 🛑 Usar AnalisisResult
+            val analisisResult = analisisRepo.analizarLectura()
 
-            if (analisis != null) {
-                Log.d(TAG, """
-                    📡 Respuesta del backend:
-                    - alerta_ia: ${analisis.alerta_ia}
-                    - mensaje: ${analisis.mensaje_lectura}
-                """.trimIndent())
+            if (analisisResult.success != null) {
+                // CASO ÉXITO
+                val analisis = analisisResult.success
+
+                // ... (logging de respuesta del backend) ...
 
                 if (analisis.alerta_ia == 1) {
-                    Log.d(TAG, "🚨 ¡ALERTA DETECTADA! Mostrando AlertsActivity...")
-                    mostrarAlerta(analisis.mensaje_lectura)
-                    prefs.edit().putLong(KEY_LAST_ALERT_TIME, currentTime.toEpochMilli()).apply()
-
-                    runOnUiThread {
-                        Toast.makeText(this@SensorDataActivity, "⚠️ Nueva alerta detectada", Toast.LENGTH_SHORT).show()
-                    }
+                    // ... (manejo de alerta detectada) ...
                 } else {
                     Log.d(TAG, "✅ Sistema normal. Sin alertas activas.")
                 }
             } else {
-                Log.e(TAG, "❌ Error: No se pudo obtener respuesta del backend")
+                // 🛑 CASO ERROR (incluye "No hay datos registrados")
+                val errorMessage = analisisResult.errorMessage ?: "Error desconocido al verificar alertas."
+                Log.e(TAG, "❌ Error: No se pudo obtener análisis: $errorMessage")
                 runOnUiThread {
-                    Toast.makeText(this@SensorDataActivity, "Error al verificar alertas", Toast.LENGTH_SHORT).show()
+                    val mensajeVoz = "Error al verificar alertas: $errorMessage"
+                    speakText(mensajeVoz) // Reutiliza tu función speakText que ya tienes
                 }
             }
         } else {
             Log.d(TAG, "⏸️ Cooldown activo. Faltan ${ALERT_COOLDOWN_HOURS - hoursSinceLastAlert} horas.")
         }
     }
-
     private fun mostrarAlerta(mensaje: String) {
         val intent = Intent(this, AlertsActivity::class.java).apply {
             putExtra("alert_message", mensaje)

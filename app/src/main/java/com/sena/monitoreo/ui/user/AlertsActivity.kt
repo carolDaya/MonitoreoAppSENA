@@ -3,7 +3,7 @@ package com.sena.monitoreo.ui.user
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.util.Log
-import android.widget.TextView
+import android.widget.Toast // Importar Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -37,7 +37,7 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var waveformSeekBar: WaveformSeekBar
     private lateinit var btnPlay: MaterialButton
 
-    // 🆕 Variables para almacenar TODOS los datos de la alerta
+    // Variables para almacenar TODOS los datos de la alerta
     private var fullAlertMessage: String = "" // Mensaje completo que se reproducirá
 
     // PROPIEDADES DE CONFIGURACIÓN DE VOZ
@@ -71,7 +71,7 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         initWaveformViews()
         loadVoiceConfiguration()
 
-        // 🆕 CARGAR DATOS COMPLETOS DE LA ALERTA
+        // CARGAR DATOS COMPLETOS DE LA ALERTA
         loadAlertData()
 
         // Botón para cerrar la alerta
@@ -81,15 +81,21 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    // 🆕 Cargar los datos completos de la alerta desde el backend
+    /**
+     * Carga los datos completos de la alerta desde el backend o maneja el error.
+     * Utiliza AnalisisResult para obtener el mensaje de éxito o el mensaje de error.
+     */
     private fun loadAlertData() {
         lifecycleScope.launch {
-            try {
-                val analisis = analisisRepo.analizarLectura()
+            val analisisResult = analisisRepo.analizarLectura()
 
-                if (analisis != null && analisis.alerta_ia == 1) {
+            if (analisisResult.success != null) {
+                // CASO 1: ÉXITO (Respuesta 200 OK)
+                val analisis = analisisResult.success
+
+                // Aseguramos que solo se muestre si el backend indica alerta activa (alerta_ia == 1)
+                if (analisis.alerta_ia == 1) {
                     // 🎯 CONSTRUIR EL MENSAJE COMPLETO CON TODA LA INFORMACIÓN IMPORTANTE
-                    val mensaje = analisis.mensaje_lectura
                     val tipoEstado = analisis.tipo_estado ?: "Estado desconocido"
                     val tipoAlerta = analisis.tipo_alerta_modelo ?: "Alerta general"
                     val recomendacion = analisis.recomendacion ?: "Sin recomendaciones"
@@ -106,7 +112,7 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                     binding.iaResponseText.text = displayText
 
-                    // 🔊 Mensaje para reproducir por voz (SIN mensaje_lectura)
+                    // 🔊 Mensaje para reproducir por voz
                     fullAlertMessage = buildString {
                         append("Atención. ")
                         append("$tipoEstado. ")
@@ -116,28 +122,45 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     }
 
                     Log.d(TAG, "✅ Alerta cargada: $tipoEstado")
-                    Log.d(TAG, "🔊 Mensaje a reproducir: $fullAlertMessage")
 
                 } else {
-                    // Si no hay alerta, mostrar mensaje genérico
-                    val fallbackMessage = intent.getStringExtra("alert_message")
-                        ?: "No hay alertas activas en este momento"
-
+                    // Si el 200 OK no contiene alerta activa (alerta_ia != 1)
+                    val fallbackMessage = "No hay alertas activas en este momento"
                     binding.iaResponseText.text = fallbackMessage
                     fullAlertMessage = fallbackMessage
-
-                    Log.w(TAG, "⚠️ No se detectó alerta activa")
+                    Log.w(TAG, "⚠️ Backend OK, pero no se detectó alerta activa")
+                    // Se podría cerrar la actividad aquí si se lanzó sin una alerta
                 }
 
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Error al cargar datos de alerta", e)
+            } else if (analisisResult.errorMessage != null) {
+                // CASO 2: ERROR CONTROLADO (ej. 400 Bad Request con código 1001 o 1002)
+                val errorMessage = analisisResult.errorMessage
 
-                // Fallback: usar el mensaje del Intent si existe
-                val fallbackMessage = intent.getStringExtra("alert_message")
-                    ?: "Error al cargar información de la alerta"
+                Log.e(TAG, "❌ Error controlado al cargar alerta: $errorMessage")
 
-                binding.iaResponseText.text = fallbackMessage
-                fullAlertMessage = fallbackMessage
+                // Mostrar el error directamente al usuario
+                runOnUiThread {
+                    binding.iaResponseText.text = errorMessage
+                    fullAlertMessage = errorMessage
+                    Toast.makeText(this@AlertsActivity, errorMessage, Toast.LENGTH_LONG).show()
+                }
+
+            } else {
+                // CASO 3: Error de red o desconocido (errorMessage == null)
+                val fallbackMessage = "Error de conexión al cargar la alerta."
+
+                Log.e(TAG, "❌ Error desconocido al cargar alerta. Resultado nulo.")
+
+                runOnUiThread {
+                    binding.iaResponseText.text = fallbackMessage
+                    fullAlertMessage = fallbackMessage
+                    Toast.makeText(this@AlertsActivity, fallbackMessage, Toast.LENGTH_LONG).show()
+                }
+            }
+
+            // Iniciar la reproducción si hay un mensaje (ya sea de alerta o de error)
+            if (fullAlertMessage.isNotEmpty() && ttsReady) {
+                startSpeaking()
             }
         }
     }
@@ -145,6 +168,11 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     // ---------------------------------------------------------------------
     //                      LÓGICA DE VOZ Y ONDAS
     // ---------------------------------------------------------------------
+
+    // ... (El resto de funciones loadVoiceConfiguration, initWaveformViews, setupWaveformSamples)
+    // ... (El resto de startSpeaking, stopSpeaking, startWaveformAnimation, speakText)
+    // ... (El resto de onInit, applyTtsSettings, setupMaleVoice, setupFemaleVoice, setupRoboticVoice, mapPitchValue)
+    // ... (El resto de onDestroy)
 
     private fun loadVoiceConfiguration() {
         viewModel.loadCurrentConfig()
@@ -195,11 +223,11 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         isSpeaking = true
         btnPlay.setIconResource(R.drawable.ic_stop)
 
-        // 🔊 REPRODUCE EL MENSAJE COMPLETO (con recomendaciones)
+        // 🔊 REPRODUCE EL MENSAJE COMPLETO (con recomendaciones o el error)
         speakText(fullAlertMessage)
         startWaveformAnimation(fullAlertMessage.length)
 
-        Log.d(TAG, "🔊 Reproduciendo alerta completa")
+        Log.d(TAG, "🔊 Reproduciendo alerta o mensaje de error: $fullAlertMessage")
     }
 
     private fun stopSpeaking() {
@@ -242,13 +270,11 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             ttsReady = true
             applyTtsSettings()
 
-            // 🔊 Reproducir automáticamente cuando esté listo
-            lifecycleScope.launch {
-                // Esperar un poco a que se carguen los datos
-                delay(1000)
-                if (fullAlertMessage.isNotEmpty()) {
-                    startSpeaking()
-                }
+            // 🔊 Reproducir automáticamente cuando esté listo (solo si el mensaje ya fue cargado)
+            if (fullAlertMessage.isNotEmpty()) {
+                // No necesitamos el delay aquí si fullAlertMessage ya tiene contenido
+                // Si tienes problemas de concurrencia, puedes descomentar el delay.
+                startSpeaking()
             }
         } else {
             Log.e(TAG, "Error con TextToSpeech: $status")

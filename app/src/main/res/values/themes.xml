@@ -1,18 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Base application theme -->
-    <style name="Base.Theme.SENAMonitoreo" parent="Theme.Material3.DayNight.NoActionBar" />
-
-    <style name="Theme.SENAMonitoreo" parent="Base.Theme.SENAMonitoreo" />
-
-    <style name="Theme.YourAppName" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <!-- ====== BASE APP THEME ====== -->
+    <style name="Base.Theme.SENAMonitoreo" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/background_primary</item>
         <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/green_icon</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorAccent">@color/gold</item>
+        <item name="android:statusBarColor">@color/background_primary</item>
+        <item name="android:navigationBarColor">@color/background_primary</item>
+    </style>
+
+
+    <!-- ====== MAIN THEME ====== -->
+    <style name="Theme.SENAMonitoreo" parent="Base.Theme.SENAMonitoreo" />
+
+    <!-- ====== CUSTOM APP THEME ====== -->
+    <style name="Theme.YourAppName" parent="Base.Theme.SENAMonitoreo">
+        <item name="colorPrimary">@color/background_primary</item>
         <item name="colorAccent">@color/gold</item>
         <item name="android:statusBarColor">@color/background_primary</item>
     </style>
 
-    <!-- TEXTS -->
+    <!-- ====== TEXT STYLES ====== -->
     <style name="TextAppearance.App.Title" parent="TextAppearance.AppCompat.Title">
         <item name="android:fontFamily">@font/montserrat_extrabold</item>
         <item name="android:textColor">@color/gold</item>
@@ -20,17 +31,24 @@
         <item name="android:textAlignment">center</item>
     </style>
 
-    <style name="TextAppearance.App.Link" parent="TextAppearance.AppCompat">
+    <style name="TextAppearance.App.Subtitle" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:fontFamily">@font/montserrat</item>
+        <item name="android:textSize">@dimen/text_size_l</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textAlignment">center</item>
+    </style>
+
+    <style name="TextAppearance.App.Link" parent="TextAppearance.AppCompat.Body1">
         <item name="android:textColor">@color/white</item>
         <item name="android:textSize">@dimen/text_size_m</item>
     </style>
 
+    <!-- ====== INPUTS ====== -->
     <style name="Widget.App.TextInputEditText.WhiteCursor" parent="Widget.MaterialComponents.TextInputEditText.OutlinedBox">
         <item name="android:textColor">@color/white</item>
         <item name="android:textCursorDrawable">@drawable/cursor_white</item>
     </style>
 
-    <!-- INPUTS OUTLINED -->
     <style name="Widget.App.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
         <item name="hintTextColor">@color/white</item>
         <item name="boxCollapsedPaddingTop">12sp</item>
@@ -43,25 +61,17 @@
         <item name="hintTextColor">@color/gray_500</item>
         <item name="boxStrokeColor">@color/green_icon</item>
         <item name="startIconTint">@color/green_icon</item>
-
     </style>
 
-    <!-- BUTTON -->
-    <style name="Widget.App.Button.Filled" parent="Widget.AppCompat.Button">
+    <!-- ====== BUTTON ====== -->
+    <style name="Widget.App.Button.Filled" parent="Widget.MaterialComponents.Button">
         <item name="android:background">@drawable/btn_border_white_bg_green</item>
         <item name="android:elevation">8dp</item>
         <item name="android:textColor">@color/white</item>
         <item name="android:textSize">@dimen/text_size_l</item>
         <item name="android:paddingTop">@dimen/spacing_s</item>
         <item name="android:paddingBottom">@dimen/spacing_s</item>
-    </style>
-
-    <!-- SUBTITLE -->
-    <style name="TextAppearance.App.Subtitle" parent="TextAppearance.MaterialComponents.Body1">
-        <item name="android:fontFamily">@font/montserrat</item>
-        <item name="android:textSize">@dimen/text_size_l</item>
-        <item name="android:textColor">@color/white</item>
-        <item name="android:textAlignment">center</item>
+        <item name="cornerRadius">@dimen/spacing_s</item>
     </style>
 
 </resources>

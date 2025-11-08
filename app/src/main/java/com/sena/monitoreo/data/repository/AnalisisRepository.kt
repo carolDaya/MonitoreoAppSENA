@@ -1,29 +1,57 @@
 package com.sena.monitoreo.data.repository
 
-import android.util.Log
+import com.google.gson.Gson
+import com.sena.monitoreo.data.api.ApiAiService
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.model.ai.AnalisisResponse
+import com.sena.monitoreo.data.model.base.ApiErrorResponse
+import retrofit2.Response
 
-class AnalisisRepository {
+/**
+ * Repositorio para la lógica de análisis de IA.
+ * Utiliza un AnalisisResult para devolver el éxito o un mensaje de error controlado.
+ */
+class AnalisisRepository(private val apiAiService: ApiAiService = RetrofitClient.apiAi) {
 
-    private val apiService = RetrofitClient.apiAi
-    private val TAG = "AnalisisRepository"
+    /**
+     * Clase de datos sellada para encapsular el resultado de la operación: éxito con datos, o error con mensaje.
+     */
+    data class AnalisisResult(
+        val success: AnalisisResponse? = null,
+        val errorMessage: String? = null
+    )
 
-    suspend fun analizarLectura(): AnalisisResponse? {
+    /**
+     * Realiza la llamada a la API de análisis de IA y maneja las respuestas HTTP,
+     * incluyendo la deserialización de errores 400 Bad Request.
+     */
+    suspend fun analizarLectura(): AnalisisResult {
+        return try {
+            val response: Response<AnalisisResponse> = apiAiService.analizarDatos()
 
-        try {
-            // Llamada simple al servidor sin parámetros
-            val response = apiService.analizarDatos()
-
-            if (response.isSuccessful && response.body() != null) {
-                return response.body()
+            if (response.isSuccessful) {
+                // ÉXITO (200 OK)
+                AnalisisResult(success = response.body())
             } else {
-                Log.e(TAG, "Error en la respuesta de la IA: ${response.code()}. Mensaje: ${response.errorBody()?.string()}")
-                return null
+                // ERROR (4xx, 5xx) - Intentar obtener el cuerpo del error
+                val errorBodyString = response.errorBody()?.string()
+
+                // Intenta deserializar el error JSON en nuestro modelo ApiErrorResponse
+                val gson = Gson()
+                val errorData = try {
+                    gson.fromJson(errorBodyString, ApiErrorResponse::class.java)
+                } catch (e: Exception) {
+                    // Si falla la deserialización, es un error no JSON o inesperado.
+                    ApiErrorResponse(error = "Error ${response.code()}: Respuesta de error inesperada.")
+                }
+
+                // Usamos el mensaje de error del JSON (que contiene 1001/1002) o un mensaje genérico
+                val finalError = errorData.error ?: "Error desconocido del servidor (${response.code()})."
+                AnalisisResult(errorMessage = finalError)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error de red al llamar a la IA: ${e.message}")
-            return null
+            // ERROR DE CONEXIÓN O EXCEPCIÓN DE KOTLIN/JAVA
+            AnalisisResult(errorMessage = "Error de conexión: ${e.message}. Verifique la red y el servidor.")
         }
     }
 }

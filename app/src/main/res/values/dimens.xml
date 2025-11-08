@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- ESPACIADOS (Margins & Paddings) -->
+
+    <!-- 🔲 ESPACIADOS (Margins & Paddings) -->
     <dimen name="spacing_xxsmall">2dp</dimen>
     <dimen name="spacing_xsmall">4dp</dimen>
     <dimen name="spacing_small">8dp</dimen>
@@ -18,8 +19,7 @@
     <dimen name="spacing_xxxxxlarge">90dp</dimen>
     <dimen name="spacing_xxxxxxlarge">110dp</dimen>
 
-
-    <!-- TEXTOS -->
+    <!-- 📝 TEXTOS -->
     <dimen name="text_size_xs">12sp</dimen>
     <dimen name="text_size_s">14sp</dimen>
     <dimen name="text_size_m">16sp</dimen>
@@ -33,21 +33,25 @@
     <dimen name="text_size_xxxxxxl">40sp</dimen>
     <dimen name="text_size_xxxxxxxl">46sp</dimen>
 
-    <!-- COMPONENTES -->
+    <!-- 🧱 COMPONENTES GENERALES -->
     <dimen name="button_height">48dp</dimen>
     <dimen name="input_height">56dp</dimen>
     <dimen name="toolbar_height">56dp</dimen>
+    <dimen name="bottom_sheet_peek_height">250dp</dimen>
+
+    <!-- 🔘 ICONOS -->
     <dimen name="icon_size_small">24dp</dimen>
     <dimen name="icon_size_medium">32dp</dimen>
     <dimen name="icon_size_large">48dp</dimen>
-    <dimen name="bottom_sheet_peek_height">250dp</dimen>
+    <dimen name="icon_size_lock_width">104dp</dimen>
+    <dimen name="icon_size_lock_height">123dp</dimen>
 
-
-    <!-- MEDIDAS ESPECIFICAS -->
-    <dimen name="icon_size_lock_w">104dp</dimen>
-    <dimen name="icon_size_lock_h">123dp</dimen>
+    <!-- 📏 MÁRGENES / PADDINGS ESPECÍFICOS -->
     <dimen name="padding_input_start">50dp</dimen>
     <dimen name="margin_input_top">136dp</dimen>
     <dimen name="margin_button_bottom">100dp</dimen>
-    <dimen name="height_section_top">250dp</dimen>
+
+    <!-- 🧩 ALTURAS DE SECCIÓN -->
+    <dimen name="section_top_height">250dp</dimen>
+
 </resources>

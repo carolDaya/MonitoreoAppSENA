@@ -6,17 +6,23 @@ import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.cardview.widget.CardView
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.masoudss.lib.WaveformSeekBar
 import com.sena.monitoreo.R
+import android.view.View
+import com.sena.monitoreo.data.api.ApiProceso
 import com.sena.monitoreo.data.api.RetrofitClient
+import com.sena.monitoreo.data.repository.ProcesoRepository
 import com.sena.monitoreo.data.repository.VoiceRepository
 import com.sena.monitoreo.databinding.ActivityHomeAdminBinding
 import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModel
 import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModelFactory
+import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModel
+import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModelFactory
 import com.sena.monitoreo.ui.auth.LoginActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -52,6 +58,11 @@ class HomeAdminActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         ViewModelProvider(this, AdminConfigViewModelFactory(repository))
             .get(AdminConfigViewModel::class.java)
     }
+    private val procesoViewModel: ProcesoViewModel by lazy {
+        val repository = ProcesoRepository(RetrofitClient.apiProceso)
+        ViewModelProvider(this, ProcesoViewModelFactory(repository))
+            .get(ProcesoViewModel::class.java)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +95,7 @@ class HomeAdminActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         setupNavigationView()
+        setupProcesoControl()
     }
 
     // Función para cargar la configuración de voz desde el backend
@@ -436,7 +448,7 @@ class HomeAdminActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun startSpeaking() {
-        val message = getString(R.string.greeting_text)
+        val message = getString(R.string.welcome_message)
         speakText(message)
         isSpeaking = true
         btnPlay.setIconResource(R.drawable.ic_stop)
@@ -495,5 +507,60 @@ class HomeAdminActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onDestroy()
         tts?.stop()
         tts?.shutdown()
+    }
+    private fun setupProcesoControl() {
+
+        val cardBinding = binding.cardProcesoControlInclude
+
+        val btnIniciar = cardBinding.btnIniciarProceso
+        val btnFinalizar = cardBinding.btnFinalizarProceso
+        val tvEstado = cardBinding.tvProcesoEstado
+        val progressBar = cardBinding.procesoProgressBar
+
+        // 1. Listeners de los botones
+        btnIniciar.setOnClickListener {
+            procesoViewModel.iniciarProceso()
+        }
+
+        btnFinalizar.setOnClickListener {
+            procesoViewModel.finalizarProceso()
+        }
+
+        // 2. Observar el estado de Carga (Loading)
+        procesoViewModel.isLoading.observe(this) { isLoading ->
+            // Deshabilitar ambos botones durante la operación para evitar doble click
+            btnIniciar.isEnabled = !isLoading && (procesoViewModel.isProcesoActivo.value == false)
+            btnFinalizar.isEnabled = !isLoading && (procesoViewModel.isProcesoActivo.value == true)
+
+            // Mostrar u ocultar la barra de progreso
+            progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+        }
+
+        // 3. Observar si hay Proceso Activo para actualizar la UI
+        procesoViewModel.isProcesoActivo.observe(this) { isActive ->
+            tvEstado.text = if (isActive) "Estado: 🟢 Activo (Monitoreando)" else "Estado: 🔴 Inactivo (Se requiere iniciar proceso)"
+
+            // Habilitar/Deshabilitar botones basado en el estado
+            val isLoading = procesoViewModel.isLoading.value ?: false
+            btnIniciar.isEnabled = !isActive && !isLoading
+            btnFinalizar.isEnabled = isActive && !isLoading
+        }
+
+        // 4. Observar el mensaje de Estado (Éxito/Error)
+        procesoViewModel.procesoStatus.observe(this) { message ->
+            if (message.isNotEmpty()) {
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                // Hablar el mensaje (como lo pide el flujo)
+                speakText(message)
+
+                // Limpiar el mensaje después de mostrarlo (opcional, para evitar repeticiones)
+                // procesoViewModel.clearStatus()
+            }
+        }
+
+        // 5. Verificar el estado inicial del proceso al cargar la actividad
+        // 💡 Esto es CRÍTICO: Necesitas llamar a tu ViewModel para saber si hay un proceso activo al inicio
+        // Asumiendo que agregaste 'verificarEstadoProceso()' a tu ProcesoViewModel y Backend
+        procesoViewModel.verificarEstadoProceso()
     }
 }

@@ -7,14 +7,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_primary"
-    tools:context="com.sena.monitoreo.ui.auth.LoginActivity">
+    tools:context=".ui.auth.LoginActivity">
 
+    <!-- BottomSheet -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/main_content_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
         <!-- Imagen de fondo decorativa -->
+
+        <!-- Logo principal -->
+
         <ImageView
             android:id="@+id/background_image"
             android:layout_width="0dp"
@@ -24,13 +28,13 @@
             android:scaleType="centerCrop"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.1"
+            app:layout_constraintVertical_bias="0.06"
             app:srcCompat="@drawable/logo_gradient_circle"
             tools:ignore="ContentDescription" />
 
-        <!-- Logo principal -->
         <ImageView
             android:id="@+id/logo_bmis_image"
             android:layout_width="0dp"
@@ -42,7 +46,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.161"
+            app:layout_constraintVertical_bias="0.16"
             app:layout_constraintWidth_percent="0.8"
             app:srcCompat="@drawable/logo_image_bmis" />
 
@@ -56,13 +60,13 @@
             android:contentDescription="@string/desc_image_plane"
             android:scaleType="fitCenter"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.907"
+            app:layout_constraintHorizontal_bias="0.9"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintWidth_percent="0.6"
             app:srcCompat="@drawable/logo_plane" />
 
-        <!-- Título y subtítulo -->
+        <!-- Título -->
         <TextView
             android:id="@+id/title_bmis_text"
             style="@style/TextAppearance.App.Title"
@@ -75,6 +79,7 @@
             app:layout_constraintTop_toBottomOf="@id/logo_bmis_image"
             tools:ignore="TextContrastCheck" />
 
+        <!-- Subtítulo -->
         <TextView
             android:id="@+id/subtitle_control_app"
             style="@style/TextAppearance.App.Subtitle"
@@ -86,7 +91,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/title_bmis_text" />
 
-        <!-- Input Phone -->
+        <!-- Input Teléfono -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/input_layout_phone"
             style="@style/Widget.App.TextInputLayout.OutlinedBox"
@@ -94,11 +99,11 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_large"
             android:hint="@string/login_phone_hint"
-            app:startIconDrawable="@drawable/ic_user_white"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/subtitle_control_app"
-            app:layout_constraintWidth_percent="0.85">
+            app:layout_constraintWidth_percent="0.85"
+            app:startIconDrawable="@drawable/ic_user_white">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/input_phone"
@@ -106,15 +111,15 @@
                 android:layout_height="@dimen/input_height"
                 android:autofillHints="phone"
                 android:inputType="phone"
-                android:textColor="@color/white"
-                android:textCursorDrawable="@drawable/cursor_white"
                 android:paddingStart="@dimen/padding_input_start"
                 android:paddingEnd="@dimen/padding_input_start"
+                android:textColor="@color/white"
+                android:textCursorDrawable="@drawable/cursor_white"
                 android:textSize="@dimen/text_size_lg"
-                tools:ignore="VisualLintTextFieldSize"/>
+                tools:ignore="VisualLintTextFieldSize" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Input Password -->
+        <!-- Input Contraseña -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/input_layout_password"
             style="@style/Widget.App.TextInputLayout.OutlinedBox"
@@ -122,12 +127,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_medium"
             android:hint="@string/login_password_hint"
-            app:startIconDrawable="@drawable/ic_lock_white"
-            app:passwordToggleEnabled="true"
+            app:endIconMode="password_toggle"
+            app:endIconTint="@color/white"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/input_layout_phone"
-            app:layout_constraintWidth_percent="0.85">
+            app:layout_constraintWidth_percent="0.85"
+            app:startIconDrawable="@drawable/ic_lock_white">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/input_password"
@@ -140,11 +146,10 @@
                 android:paddingEnd="@dimen/padding_input_start"
                 android:textColor="@color/white"
                 android:textSize="@dimen/text_size_lg"
-                app:cursorColor="@color/white"
                 tools:ignore="VisualLintTextFieldSize" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- TextView para errores -->
+        <!-- TextView de Error -->
         <TextView
             android:id="@+id/tvError"
             android:layout_width="0dp"
@@ -152,31 +157,20 @@
             android:textColor="@android:color/holo_red_light"
             android:textSize="14sp"
             android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/input_layout_password"
+            app:layout_constraintEnd_toEndOf="@id/input_layout_password"
             app:layout_constraintStart_toStartOf="@id/input_layout_password"
-            app:layout_constraintEnd_toEndOf="@id/input_layout_password"/>
+            app:layout_constraintTop_toBottomOf="@id/input_layout_password" />
 
-        <!-- Remember me y Forgot password -->
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/remember_forgot_container"
-            android:layout_width="0dp"
+        <!-- Olvidé mi contraseña -->
+        <TextView
+            android:id="@+id/forgot_password_text"
+            style="@style/TextAppearance.App.Link"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_small"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvError"
-            app:layout_constraintWidth_percent="0.85">
-
-            <TextView
-                android:id="@+id/forgot_password_text"
-                style="@style/TextAppearance.App.Link"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/login_forgot_password"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
+            android:text="@string/login_forgot_password"
+            app:layout_constraintEnd_toEndOf="@id/input_layout_password"
+            app:layout_constraintTop_toBottomOf="@id/tvError" />
 
         <!-- Crear cuenta -->
         <TextView
@@ -188,23 +182,23 @@
             android:text="@string/login_prompt"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/remember_forgot_container" />
+            app:layout_constraintTop_toBottomOf="@id/forgot_password_text" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- BottomSheet -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottom_sheet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/dialog_bg_login"
+        app:layout_anchor="@+id/main_content_layout"
+        app:layout_anchorGravity="bottom|center"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
         <ImageView
             android:id="@+id/bottom_sheet_handle"
             android:layout_width="70dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
             android:layout_marginTop="@dimen/spacing_small"
             android:contentDescription="@null"
             android:importantForAccessibility="no"
@@ -229,5 +223,7 @@
             app:layout_constraintTop_toBottomOf="@id/bottom_sheet_handle"
             app:layout_constraintWidth_percent="0.85"
             app:backgroundTint="@null"/>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
