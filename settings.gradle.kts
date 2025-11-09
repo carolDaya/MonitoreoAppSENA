@@ -9,18 +9,22 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        maven { url = uri("https://jitpack.io") }
+        // ⚠️ Añade JCenter solo si es necesario
+        maven { url = uri("https://jcenter.bintray.com/") }
     }
 }
-// settings.gradle.kts
+
 dependencyResolutionManagement {
     repositories {
         google()
-        mavenCentral() // ¡Asegúrate de que esta línea esté presente!
-        // Agrega el repositorio de JitPack aquí
+        mavenCentral()
         maven(url = "https://jitpack.io")
+        // ⚠️ Añade JCenter solo para dependencias viejas como kprogresshud
+        maven(url = "https://jcenter.bintray.com/")
     }
 }
 
 rootProject.name = "SENA Monitoreo"
 include(":app")
- 
+include(":mylibrary")

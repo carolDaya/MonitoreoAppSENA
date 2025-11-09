@@ -2,26 +2,29 @@ package com.sena.monitoreo.ui
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.sena.monitoreo.R
 import com.sena.monitoreo.ui.auth.LoginActivity
-import com.sena.monitoreo.ui.user.HomeUserActivity
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class SplashActivity : AppCompatActivity() {
 
-    private val SPLASH_TIME_OUT: Long = 4000 // 4 segundos
+    companion object {
+        private const val SPLASH_TIMEOUT = 4000L // 4 segundos
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_splash)
 
-        // Mostrar splash y luego abrir LoginActivity
-        Handler(Looper.getMainLooper()).postDelayed({
-            val intent = Intent(this, LoginActivity::class.java)
-            startActivity(intent)
+        // Esperar SPLASH_TIMEOUT y abrir LoginActivity
+        lifecycleScope.launch {
+            delay(SPLASH_TIMEOUT)
+            startActivity(Intent(this@SplashActivity, LoginActivity::class.java))
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
             finish()
-        }, SPLASH_TIME_OUT)
+        }
     }
 }

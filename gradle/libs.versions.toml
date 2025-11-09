@@ -18,7 +18,7 @@ okhttp = "4.12.0"
 lifecycle = "2.8.1"
 waveformseekbar = "5.0.2"
 amplituda = "2.2.2"
-
+spinkit = "1.4.0"
 [libraries]
 # AndroidX
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -57,6 +57,9 @@ lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx
 waveform = { module = "com.github.massoudss:waveformSeekBar", version.ref = "waveformseekbar" }
 amplituda = { module = "com.github.lincollincol:amplituda", version.ref = "amplituda" }
 
+ybq-spinkit = { module = "com.github.ybq:Android-SpinKit", version.ref = "spinkit" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "agp" }

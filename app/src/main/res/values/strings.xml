@@ -81,7 +81,7 @@
 
     <!-- ================= RESTABLECER CONTRASEÑA ================= -->
     <string name="forgot_password_title">¿Has olvidado tu contraseña?</string>
-    <string name="forgot_password_instructions">Te enviaremos instrucciones para restablecerla</string>
+    <string name="forgot_password_instructions">Ingresa tu número de teléfono para verificar tu cuenta.</string>
     <string name="forgot_password_phone_hint">Ingresa tu teléfono</string>
     <string name="reset_password">Restablecer contraseña</string>
     <string name="reset_password_title">Restablecer contraseña</string>
@@ -152,5 +152,8 @@
     <string name="error_field_required">Este campo es obligatorio</string>
     <string name="error_passwords_not_match">Las contraseñas no coinciden</string>
     <string name="error_accept_terms">Debes aceptar los términos y condiciones</string>
+    <string name="desc_text_animation">Animación lottie del nombre de la aplicación</string>
+    <string name="desc_logo_animation">Animación lottie del logo de la aplicación</string>
+    <string name="forbided_field_required">El número no puede tener más de 10 dígitos.</string>
 
 </resources>

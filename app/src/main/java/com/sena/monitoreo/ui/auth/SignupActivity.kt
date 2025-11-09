@@ -1,19 +1,19 @@
 package com.sena.monitoreo.ui.auth
 
-import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
-import com.sena.monitoreo.R
 import com.sena.monitoreo.data.model.auth.RegisterRequest
 import com.sena.monitoreo.data.repository.AuthRepository
 import com.sena.monitoreo.databinding.ActivitySignupBinding
 import com.sena.monitoreo.ui.user.HomeUserActivity
+import com.sena.monitoreo.utils.ApiResult
+import com.sena.monitoreo.utils.UiUtils
 import kotlinx.coroutines.launch
+import com.sena.monitoreo.R
 
 class SignupActivity : AppCompatActivity() {
 
@@ -23,31 +23,28 @@ class SignupActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         binding = ActivitySignupBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.containerSignup) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.containerSignup) { view, insets ->
+            val systemBarsInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(systemBarsInsets.left, systemBarsInsets.top, systemBarsInsets.right, systemBarsInsets.bottom)
             insets
         }
 
+        setupClickListeners()
+    }
+
+    private fun setupClickListeners() {
         binding.backArrow.setOnClickListener { finish() }
 
         binding.textLoginLink.setOnClickListener {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
+            UiUtils.navigateTo(this, LoginActivity::class.java, finishCurrent = true)
         }
 
-        binding.textViewTermsAndConditions.setOnClickListener {
-            Toast.makeText(this, "Redireccionando a los términos...", Toast.LENGTH_SHORT).show()
-        }
-
-        // 🟢 Aquí cambiamos la lógica del botón:
         binding.buttonRegister.setOnClickListener {
-            if (validateForm()) {
-                registerUser()
-            }
+            if (isFormValid()) registerUser()
         }
     }
 
@@ -56,40 +53,32 @@ class SignupActivity : AppCompatActivity() {
             nombre = binding.editTextName.text.toString().trim(),
             telefono = binding.editTextPhone.text.toString().trim(),
             password = binding.inputPassword.text.toString().trim(),
-            confirm_password = binding.inputConfirmPassword.text.toString().trim()
+            confirmPassword = binding.inputConfirmPassword.text.toString().trim()
         )
 
+        UiUtils.showLoading(this, "Registrando...")
+
         lifecycleScope.launch {
-            try {
-                val response = authRepository.register(request)
-
-                if (response.isSuccessful) {
-                    val message = response.body()?.message ?: "Registro exitoso"
-                    Toast.makeText(this@SignupActivity, message, Toast.LENGTH_SHORT).show()
-
-                    val intent = Intent(this@SignupActivity, HomeUserActivity::class.java)
-                    startActivity(intent)
-                    finish()
-                } else {
-                    Toast.makeText(
-                        this@SignupActivity,
-                        "Error al registrar: ${response.errorBody()?.string()}",
-                        Toast.LENGTH_LONG
-                    ).show()
+            when (val result = authRepository.register(request)) {
+                is ApiResult.Success -> {
+                    UiUtils.hideLoading()
+                    UiUtils.showSnackbar(binding.root, result.data.message)
+                    UiUtils.navigateTo(this@SignupActivity, HomeUserActivity::class.java, finishCurrent = true)
                 }
-            } catch (e: Exception) {
-                Toast.makeText(this@SignupActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                e.printStackTrace()
+
+                is ApiResult.Error -> {
+                    UiUtils.hideLoading()
+                    UiUtils.showSnackbar(binding.root, result.message, isError = true)
+                }
             }
         }
     }
 
-    private fun validateForm(): Boolean {
+    private fun isFormValid(): Boolean {
         val name = binding.editTextName.text.toString().trim()
         val phone = binding.editTextPhone.text.toString().trim()
         val password = binding.inputPassword.text.toString().trim()
         val confirmPassword = binding.inputConfirmPassword.text.toString().trim()
-        val termsAccepted = binding.checkboxTerms.isChecked
 
         binding.textInputLayoutName.error = null
         binding.textInputLayoutPhone.error = null
@@ -104,6 +93,10 @@ class SignupActivity : AppCompatActivity() {
             binding.textInputLayoutPhone.error = getString(R.string.error_field_required)
             return false
         }
+        if (!phone.matches(Regex("^\\d{10}$"))) {
+            binding.textInputLayoutPhone.error = getString(R.string.forbided_field_required)
+            return false
+        }
         if (password.isBlank()) {
             binding.inputPasswordLayout.error = getString(R.string.error_field_required)
             return false
@@ -116,10 +109,7 @@ class SignupActivity : AppCompatActivity() {
             binding.textInputLayoutConfirmPassword.error = getString(R.string.error_passwords_not_match)
             return false
         }
-        if (!termsAccepted) {
-            Toast.makeText(this, getString(R.string.error_accept_terms), Toast.LENGTH_SHORT).show()
-            return false
-        }
+
         return true
     }
 }

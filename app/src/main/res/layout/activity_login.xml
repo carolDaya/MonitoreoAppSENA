@@ -9,16 +9,13 @@
     android:background="@color/background_primary"
     tools:context=".ui.auth.LoginActivity">
 
-    <!-- BottomSheet -->
+    <!-- ================== CONTENIDO PRINCIPAL ================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/main_content_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
         <!-- Imagen de fondo decorativa -->
-
-        <!-- Logo principal -->
-
         <ImageView
             android:id="@+id/background_image"
             android:layout_width="0dp"
@@ -26,15 +23,16 @@
             android:adjustViewBounds="true"
             android:importantForAccessibility="no"
             android:scaleType="centerCrop"
+            android:contentDescription="@null"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_bias="0.06"
             app:srcCompat="@drawable/logo_gradient_circle"
             tools:ignore="ContentDescription" />
 
+        <!-- Logo principal -->
         <ImageView
             android:id="@+id/logo_bmis_image"
             android:layout_width="0dp"
@@ -57,8 +55,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_medium"
             android:adjustViewBounds="true"
-            android:contentDescription="@string/desc_image_plane"
+            android:importantForAccessibility="no"
             android:scaleType="fitCenter"
+            android:contentDescription="@null"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.9"
             app:layout_constraintStart_toStartOf="parent"
@@ -66,7 +65,7 @@
             app:layout_constraintWidth_percent="0.6"
             app:srcCompat="@drawable/logo_plane" />
 
-        <!-- Título -->
+        <!-- Título principal -->
         <TextView
             android:id="@+id/title_bmis_text"
             style="@style/TextAppearance.App.Title"
@@ -74,6 +73,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_small"
             android:text="@string/app_title"
+            android:importantForAccessibility="yes"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/logo_bmis_image"
@@ -87,11 +87,12 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_xsmall"
             android:text="@string/app_control"
+            android:importantForAccessibility="yes"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/title_bmis_text" />
 
-        <!-- Input Teléfono -->
+        <!-- Campo de teléfono -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/input_layout_phone"
             style="@style/Widget.App.TextInputLayout.OutlinedBox"
@@ -111,6 +112,7 @@
                 android:layout_height="@dimen/input_height"
                 android:autofillHints="phone"
                 android:inputType="phone"
+                android:importantForAccessibility="yes"
                 android:paddingStart="@dimen/padding_input_start"
                 android:paddingEnd="@dimen/padding_input_start"
                 android:textColor="@color/white"
@@ -119,7 +121,7 @@
                 tools:ignore="VisualLintTextFieldSize" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Input Contraseña -->
+        <!-- Campo de contraseña -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/input_layout_password"
             style="@style/Widget.App.TextInputLayout.OutlinedBox"
@@ -142,6 +144,7 @@
                 android:layout_height="@dimen/input_height"
                 android:autofillHints="password"
                 android:inputType="textPassword"
+                android:importantForAccessibility="yes"
                 android:paddingStart="@dimen/padding_input_start"
                 android:paddingEnd="@dimen/padding_input_start"
                 android:textColor="@color/white"
@@ -149,19 +152,20 @@
                 tools:ignore="VisualLintTextFieldSize" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- TextView de Error -->
+        <!-- Texto de error -->
         <TextView
-            android:id="@+id/tvError"
+            android:id="@+id/text_error_message"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:textColor="@android:color/holo_red_light"
             android:textSize="14sp"
             android:visibility="gone"
+            android:importantForAccessibility="no"
             app:layout_constraintEnd_toEndOf="@id/input_layout_password"
             app:layout_constraintStart_toStartOf="@id/input_layout_password"
             app:layout_constraintTop_toBottomOf="@id/input_layout_password" />
 
-        <!-- Olvidé mi contraseña -->
+        <!-- Enlace: Olvidé mi contraseña -->
         <TextView
             android:id="@+id/forgot_password_text"
             style="@style/TextAppearance.App.Link"
@@ -169,10 +173,11 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_small"
             android:text="@string/login_forgot_password"
+            android:importantForAccessibility="yes"
             app:layout_constraintEnd_toEndOf="@id/input_layout_password"
-            app:layout_constraintTop_toBottomOf="@id/tvError" />
+            app:layout_constraintTop_toBottomOf="@id/text_error_message" />
 
-        <!-- Crear cuenta -->
+        <!-- Enlace: Crear cuenta -->
         <TextView
             android:id="@+id/create_account_text"
             style="@style/TextAppearance.App.Link"
@@ -180,12 +185,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_small"
             android:text="@string/login_prompt"
+            android:importantForAccessibility="yes"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/forgot_password_text" />
-
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- ================== BOTTOM SHEET ================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottom_sheet"
         android:layout_width="match_parent"
@@ -195,6 +201,7 @@
         app:layout_anchorGravity="bottom|center"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
+        <!-- Indicador superior del BottomSheet -->
         <ImageView
             android:id="@+id/bottom_sheet_handle"
             android:layout_width="70dp"
@@ -208,6 +215,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- Botón de acceso -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/login_button"
             style="@style/Widget.App.Button.Filled"
@@ -217,13 +225,13 @@
             android:layout_marginBottom="@dimen/spacing_medium"
             android:text="@string/common_access"
             android:visibility="gone"
+            android:importantForAccessibility="yes"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/bottom_sheet_handle"
             app:layout_constraintWidth_percent="0.85"
-            app:backgroundTint="@null"/>
-
+            app:backgroundTint="@null" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
