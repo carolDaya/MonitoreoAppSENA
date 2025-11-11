@@ -1,4 +1,3 @@
-// AdminConfigViewModel.kt
 package com.sena.monitoreo.ui.admin.viewmodel
 
 import androidx.lifecycle.LiveData
@@ -19,13 +18,16 @@ class AdminConfigViewModel(private val repository: VoiceRepository) : ViewModel(
     private val _saveStatus = MutableLiveData<String>()
     val saveStatus: LiveData<String> = _saveStatus
 
+    // LiveData para notificar el éxito del guardado
+    private val _saveSuccess = MutableLiveData<Boolean>()
+    val saveSuccess: LiveData<Boolean> = _saveSuccess
+
     // LiveData para indicar si una operación está en curso (cargando)
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
 
     /**
      * Carga la configuración de voz actual desde el backend.
-     * Usado al iniciar la Activity para precargar los Spinners.
      */
     fun loadCurrentConfig() {
         viewModelScope.launch {
@@ -34,7 +36,8 @@ class AdminConfigViewModel(private val repository: VoiceRepository) : ViewModel(
                 val config = repository.getVoiceConfig()
                 _currentConfig.postValue(config)
             } catch (e: Exception) {
-                _saveStatus.postValue("Error al cargar la configuración actual: ${e.message}")
+                // Aquí usamos Log, el Snackbar se maneja en la Activity
+                // _saveStatus.postValue("Error al cargar la configuración actual: ${e.message}")
             } finally {
                 _isLoading.value = false
             }
@@ -47,13 +50,20 @@ class AdminConfigViewModel(private val repository: VoiceRepository) : ViewModel(
     fun saveConfiguration(gender: String, pitch: Float) {
         viewModelScope.launch {
             _isLoading.value = true
+            _saveSuccess.value = false
             try {
                 repository.saveVoiceConfig(gender, pitch)
+
+                loadCurrentConfig()
+
                 _saveStatus.postValue("Configuración de voz guardada con éxito.")
+                _saveSuccess.postValue(true)
+
             } catch (e: Exception) {
                 _saveStatus.postValue("Error al guardar: ${e.message}")
+                _saveSuccess.postValue(false)
             } finally {
-                _isLoading.value = false
+                // La Activity ocultará el loading observando _isLoading
             }
         }
     }

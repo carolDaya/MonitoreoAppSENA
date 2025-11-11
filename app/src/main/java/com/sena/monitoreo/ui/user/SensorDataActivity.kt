@@ -12,13 +12,12 @@ import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.data.Entry
 import com.sena.monitoreo.R
 import com.sena.monitoreo.data.api.RetrofitClient
-import com.sena.monitoreo.data.repository.AnalisisRepository
-import com.sena.monitoreo.data.repository.GraficasRepository
-import com.sena.monitoreo.data.repository.LecturaRepository
-import com.sena.monitoreo.data.repository.VoiceRepository
+import com.sena.monitoreo.data.repository.*
 import com.sena.monitoreo.databinding.ActivitySensorDataBinding
 import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModel
 import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModelFactory
+import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModel
+import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModelFactory
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.alerts.AlertManager
@@ -39,11 +38,17 @@ class SensorDataActivity : BaseVoiceActivity() {
     private val lecturaRepo = LecturaRepository()
     private val analisisRepo = AnalisisRepository(RetrofitClient.apiAi)
 
-    // ViewModel
+    // ViewModels
     private val viewModel: AdminConfigViewModel by lazy {
         val repository = VoiceRepository(RetrofitClient.apiVoice)
         ViewModelProvider(this, AdminConfigViewModelFactory(repository))
             .get(AdminConfigViewModel::class.java)
+    }
+
+    private val procesoViewModel: ProcesoViewModel by lazy {
+        val repository = ProcesoRepository(RetrofitClient.apiProceso)
+        ViewModelProvider(this, ProcesoViewModelFactory(repository))
+            .get(ProcesoViewModel::class.java)
     }
 
     private val refreshTime = 5 * 60 * 1000L // 5 minutos
@@ -59,6 +64,13 @@ class SensorDataActivity : BaseVoiceActivity() {
         setupNavigation()
         setupVoiceConfiguration()
         setupAlertTestButton()
+
+        // Observamos cambios en el proceso activo
+        procesoViewModel.isProcesoActivo.observe(this) { activo ->
+            lifecycleScope.launch {
+                loadSensorsAndCharts()
+            }
+        }
 
         // Carga inicial
         lifecycleScope.launch {
@@ -126,7 +138,7 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     private fun setupAlertTestButton() {
-        btnPlay.setOnLongClickListener {
+        binding.headerUser.waveformSection.btnPlayMessage.setOnLongClickListener {
             showTestAlertDialog()
             true
         }
@@ -158,9 +170,15 @@ class SensorDataActivity : BaseVoiceActivity() {
     private suspend fun loadSensorsAndCharts() {
         try {
             UiUtils.showLoading(this, "Actualizando datos...")
+
+            // 1️⃣ Verificar estado real del proceso
+            val hayProcesoActivo = verificarProcesoActivo()
+
+            // 2️⃣ Cargar configuraciones
             val configuraciones = graficasRepo.getGraficas()
+
             if (configuraciones.isEmpty()) {
-                showDefaultCharts()
+                showDefaultCharts(hayProcesoActivo)
             } else {
                 configuraciones.forEach { config ->
                     val sensorId = config.sensor_id
@@ -178,38 +196,94 @@ class SensorDataActivity : BaseVoiceActivity() {
                         else -> return@forEach
                     }
 
-                    val lecturas = lecturaRepo.getLecturas(sensorId)
+                    val lecturas = if (hayProcesoActivo) {
+                        lecturaRepo.getLecturas(sensorId)
+                    } else {
+                        emptyList() // Sin datos si no hay proceso activo
+                    }
+
                     if (lecturas.isNotEmpty()) {
                         val entries = lecturas.mapIndexed { index, lectura ->
                             Entry(index.toFloat(), lectura.valor.toFloat())
                         }
                         chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
+                    } else {
+                        showNoDataChart(cardView, nombreSensor, hayProcesoActivo)
                     }
                 }
             }
+
         } catch (e: Exception) {
             UiUtils.showSnackbar(binding.root, "Error cargando gráficas: ${e.message}", true)
-            showDefaultCharts()
+            showDefaultCharts(false)
         } finally {
             UiUtils.hideLoading()
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun showDefaultCharts() {
-        val entriesTemp = listOf(Entry(1f, 25f), Entry(2f, 26f), Entry(3f, 28f))
-        val entriesPresion = listOf(Entry(1f, 990f), Entry(2f, 1000f), Entry(3f, 1010f))
-        val entriesMetano = listOf(Entry(1f, 0.05f), Entry(2f, 0.06f), Entry(3f, 0.07f))
+    private suspend fun verificarProcesoActivo(): Boolean {
+        return try {
+            val response = procesoViewModel.repository.verificarEstado()
+            if (response.isSuccessful) {
+                response.body()?.proceso_activo ?: false
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
 
-        chartManager.displayChart("line", binding.cardTemperatura.root, "Temperatura",
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(2) else getLegacySensorColor(2),
-            entriesTemp, 2)
-        chartManager.displayChart("bar", binding.cardPresion.root, "Presión",
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(3) else getLegacySensorColor(3),
-            entriesPresion, 3)
-        chartManager.displayChart("pie", binding.cardMq4.root, "Metano",
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(1) else getLegacySensorColor(1),
-            entriesMetano, 1)
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun showNoDataChart(cardView: android.view.View, sensorName: String, hayProcesoActivo: Boolean) {
+        val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
+        titleTextView?.text = sensorName
+
+        // Ocultar todas las gráficas
+        cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
+        cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
+        cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
+
+        val mensaje = if (hayProcesoActivo) {
+            "⏳ Esperando datos del sensor..."
+        } else {
+            "⏸️ Proceso inactivo - Sin datos"
+        }
+
+        val textView = android.widget.TextView(this).apply {
+            text = mensaje
+            textSize = 16f
+            setTextColor(android.graphics.Color.GRAY)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 100, 0, 0)
+        }
+
+        val chartContainer = cardView.findViewById<android.view.ViewGroup>(R.id.chart_container)
+        chartContainer?.removeAllViews()
+        chartContainer?.addView(textView)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun showDefaultCharts(hayProcesoActivo: Boolean) {
+        if (hayProcesoActivo) {
+            val entriesTemp = listOf(Entry(1f, 25f), Entry(2f, 26f), Entry(3f, 28f))
+            val entriesPresion = listOf(Entry(1f, 990f), Entry(2f, 1000f), Entry(3f, 1010f))
+            val entriesMetano = listOf(Entry(1f, 0.05f), Entry(2f, 0.06f), Entry(3f, 0.07f))
+
+            chartManager.displayChart("line", binding.cardTemperatura.root, "Temperatura",
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(2) else getLegacySensorColor(2),
+                entriesTemp, 2)
+            chartManager.displayChart("bar", binding.cardPresion.root, "Presión",
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(3) else getLegacySensorColor(3),
+                entriesPresion, 3)
+            chartManager.displayChart("pie", binding.cardMq4.root, "Metano",
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(1) else getLegacySensorColor(1),
+                entriesMetano, 1)
+        } else {
+            showNoDataChart(binding.cardTemperatura.root, "Temperatura", false)
+            showNoDataChart(binding.cardPresion.root, "Presión", false)
+            showNoDataChart(binding.cardMq4.root, "Metano", false)
+        }
     }
 
     private fun getLegacySensorColor(sensorId: Int): Int = when (sensorId) {
@@ -220,12 +294,9 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     override fun onVoiceInitialized() {
-        // Iniciar verificación de alertas cuando la voz esté lista
         lifecycleScope.launch {
             alertManager.checkAndHandleAlert()
         }
-
-        // Iniciar verificación periódica
         alertManager.startPeriodicAlertCheck(lifecycleScope)
     }
 
@@ -235,7 +306,6 @@ class SensorDataActivity : BaseVoiceActivity() {
             val analisisResult = analisisRepo.analizarLectura()
             if (analisisResult.success != null) {
                 val analisis = analisisResult.success
-                // USAR DIRECTAMENTE EL MÉTODO DE LA CLASE BASE
                 val fullMessage = formatAnalysisMessage(analisis)
                 speakWithPausesAndWaveform(fullMessage, 1000L)
             } else {
@@ -247,6 +317,7 @@ class SensorDataActivity : BaseVoiceActivity() {
             }
         }
     }
+
     private fun showAlert(message: String) {
         val intent = Intent(this, AlertsActivity::class.java).apply {
             putExtra("alert_message", message)

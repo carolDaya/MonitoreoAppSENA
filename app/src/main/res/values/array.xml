@@ -8,7 +8,6 @@
     </string-array>
 
     <string-array name="tipos_de_voz">
-        <item>Masculina</item>
         <item>Femenina</item>
         <item>Robótica</item>
     </string-array>
@@ -16,6 +15,5 @@
     <string-array name="tonos_de_voz">
         <item>Grave</item>
         <item>Normal</item>
-        <item>Agudo</item>
     </string-array>
 </resources>

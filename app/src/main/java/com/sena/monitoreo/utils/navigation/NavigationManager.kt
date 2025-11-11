@@ -1,4 +1,3 @@
-// NavigationManager.kt (actualizado)
 package com.sena.monitoreo.utils.navigation
 
 import android.content.Context
@@ -7,6 +6,8 @@ import android.content.SharedPreferences
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
 import com.sena.monitoreo.R
+import com.sena.monitoreo.ui.admin.AdminDashboardActivity
+import com.sena.monitoreo.ui.admin.HomeAdminActivity
 import com.sena.monitoreo.ui.auth.LoginActivity
 import com.sena.monitoreo.ui.user.HomeUserActivity
 import com.sena.monitoreo.ui.user.SensorDataActivity
@@ -22,26 +23,34 @@ class NavigationManager(
 
     fun setupNavigation(currentScreen: String = "") {
         navigationView.setNavigationItemSelectedListener { item ->
-            handleNavigation(item.itemId, currentScreen)
+            handleUserNavigation(item.itemId, currentScreen)
             drawerLayout.closeDrawers()
             true
         }
     }
 
-    private fun handleNavigation(itemId: Int, currentScreen: String) {
+    fun setupAdminNavigation(currentScreen: String = "") {
+        navigationView.setNavigationItemSelectedListener { item ->
+            handleAdminNavigation(item.itemId, currentScreen)
+            drawerLayout.closeDrawers()
+            true
+        }
+    }
+
+    private fun handleUserNavigation(itemId: Int, currentScreen: String) {
         when (itemId) {
             R.id.nav_home -> {
                 if (currentScreen != "home") {
                     navigateTo(HomeUserActivity::class.java, true)
                 } else {
-                    showAlreadyHereMessage()
+                    showSnackbar("Ya estás en Inicio")
                 }
             }
             R.id.nav_datos_gas, R.id.nav_datos_tem, R.id.nav_datos_presion -> {
                 if (currentScreen != "sensor_data") {
                     navigateTo(SensorDataActivity::class.java, false)
                 } else {
-                    showAlreadyHereMessage()
+                    showSnackbar("Ya estás en la pantalla de datos")
                 }
             }
             R.id.nav_settings -> {
@@ -49,6 +58,46 @@ class NavigationManager(
             }
             R.id.nav_logout -> logout()
         }
+    }
+
+    fun handleAdminNavigation(itemId: Int, currentScreen: String) {
+        when (itemId) {
+            R.id.nav_home -> {
+                if (currentScreen != "home_admin") {
+                    navigateTo(HomeAdminActivity::class.java, true)
+                } else {
+                    showSnackbar("Ya estás en Inicio")
+                }
+            }
+            R.id.nav_graphis -> {
+                navigateToAdminDashboard("graphs")
+            }
+            R.id.nav_volumen -> {
+                navigateToAdminDashboard("ai")
+            }
+            R.id.nav_datos_gas -> {
+                showSnackbar("Datos de Gas")
+            }
+            R.id.nav_datos_tem -> {
+                showSnackbar("Datos de Temperatura")
+            }
+            R.id.nav_datos_presion -> {
+                showSnackbar("Datos de Presión")
+            }
+            R.id.nav_users -> {
+                navigateToAdminDashboard("users")
+            }
+            R.id.nav_settings -> {
+                showSnackbar("Configuración Admin")
+            }
+            R.id.nav_logout -> logout()
+        }
+    }
+
+    private fun navigateToAdminDashboard(section: String) {
+        val intent = Intent(context, AdminDashboardActivity::class.java)
+        intent.putExtra("SCROLL_TO", section)
+        context.startActivity(intent)
     }
 
     private fun navigateTo(destination: Class<*>, finishCurrent: Boolean = false) {
@@ -73,17 +122,13 @@ class NavigationManager(
         }
     }
 
-    private fun showAlreadyHereMessage() {
-        showSnackbar("Ya estás en esta pantalla")
-    }
-
-    private fun showSnackbar(message: String, isError: Boolean = false) {
+    private fun showSnackbar(message: String) {
         view?.let {
-            UiUtils.showSnackbar(it, message, isError)
+            UiUtils.showSnackbar(it, message)
         } ?: run {
             // Fallback si no hay view disponible
             if (context is android.app.Activity) {
-                UiUtils.showSnackbar((context as android.app.Activity).findViewById(android.R.id.content), message, isError)
+                UiUtils.showSnackbar((context as android.app.Activity).findViewById(android.R.id.content), message)
             }
         }
     }
