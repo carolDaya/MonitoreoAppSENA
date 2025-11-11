@@ -1,17 +1,12 @@
 package com.sena.monitoreo.ui.user
 
 import android.os.Bundle
-import android.speech.tts.TextToSpeech
 import android.util.Log
-import android.widget.Toast // Importar Toast
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.button.MaterialButton
-import com.masoudss.lib.WaveformSeekBar
 import com.sena.monitoreo.R
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.repository.AnalisisRepository
@@ -19,32 +14,18 @@ import com.sena.monitoreo.data.repository.VoiceRepository
 import com.sena.monitoreo.databinding.ActivityAlertsBinding
 import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModel
 import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModelFactory
-import kotlinx.coroutines.delay
+import com.sena.monitoreo.ui.base.BaseVoiceActivity
+import com.sena.monitoreo.utils.UiUtils
+import com.sena.monitoreo.utils.alerts.AlertManager
 import kotlinx.coroutines.launch
-import java.util.Locale
-import kotlin.random.Random
 
-class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
+class AlertsActivity : BaseVoiceActivity() {
 
     private lateinit var binding: ActivityAlertsBinding
-    private val TAG = "AlertsActivity"
-    private val analisisRepo = AnalisisRepository()
+    private lateinit var alertManager: AlertManager
 
-    // PROPIEDADES PARA VOZ Y ONDAS
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
-    private var isSpeaking = false
-    private lateinit var waveformSeekBar: WaveformSeekBar
-    private lateinit var btnPlay: MaterialButton
-
-    // Variables para almacenar TODOS los datos de la alerta
-    private var fullAlertMessage: String = "" // Mensaje completo que se reproducirá
-
-    // PROPIEDADES DE CONFIGURACIÓN DE VOZ
-    private var currentPitch: Float = 1.0f
-    private var currentGender: String = "FEMALE"
-    private val preferredMaleVoices = listOf("male", "hombre", "masculino", "man", "mfb")
-    private val preferredFemaleVoices = listOf("female", "mujer", "femenino", "woman", "efb")
+    // Repositories
+    private val analisisRepo = AnalisisRepository(RetrofitClient.apiAi)
 
     // ViewModel para configuración de voz
     private val viewModel: AdminConfigViewModel by lazy {
@@ -52,6 +33,10 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         ViewModelProvider(this, AdminConfigViewModelFactory(repository))
             .get(AdminConfigViewModel::class.java)
     }
+
+    // Variables para almacenar TODOS los datos de la alerta
+    private var fullAlertMessage: String = "" // Mensaje completo que se reproducirá
+    private var alertData: com.sena.monitoreo.data.model.ai.AnalisisResponse? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,289 +51,189 @@ class AlertsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             insets
         }
 
-        // INICIALIZAR VOZ/ONDAS y CONFIGURACIÓN
-        tts = TextToSpeech(this, this)
-        initWaveformViews()
-        loadVoiceConfiguration()
+        initializeManagers()
+        setupVoiceConfiguration()
+        setupUI()
 
         // CARGAR DATOS COMPLETOS DE LA ALERTA
         loadAlertData()
+    }
 
+    private fun initializeManagers() {
+        alertManager = AlertManager(
+            context = this,
+            analisisRepo = analisisRepo,
+            onAlertDetected = { alertMessage ->
+                // Esta función se usa para alertas periódicas, no necesaria aquí
+            },
+            onError = { errorMessage ->
+                runOnUiThread {
+                    UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
+                }
+            }
+        )
+    }
+
+    private fun setupVoiceConfiguration() {
+        // Configurar waveform components usando el método de la clase base
+        setupWaveformComponents(
+            binding.waveformSection.waveformSeekBar,
+            binding.waveformSection.btnPlayMessage
+        )
+
+        viewModel.loadCurrentConfig()
+        viewModel.currentConfig.observe(this) { config ->
+            voiceManager.currentPitch = config.pitch
+            voiceManager.currentGender = config.gender
+            if (isVoiceInitialized) {
+                voiceManager.applyTtsSettings()
+            }
+        }
+    }
+
+    private fun setupUI() {
         // Botón para cerrar la alerta
         binding.buttonMessage.setOnClickListener {
             stopSpeaking()
             finish()
         }
+
+        // Verificar si llegamos con un mensaje de alerta desde SensorDataActivity
+        val alertMessageFromIntent = intent.getStringExtra("alert_message")
+        if (!alertMessageFromIntent.isNullOrEmpty()) {
+            binding.iaResponseText.text = alertMessageFromIntent
+            fullAlertMessage = alertMessageFromIntent
+        }
     }
 
     /**
      * Carga los datos completos de la alerta desde el backend o maneja el error.
-     * Utiliza AnalisisResult para obtener el mensaje de éxito o el mensaje de error.
      */
     private fun loadAlertData() {
+        // Si ya tenemos un mensaje del intent, no necesitamos cargar más datos
+        if (fullAlertMessage.isNotEmpty()) {
+            return
+        }
+
         lifecycleScope.launch {
-            val analisisResult = analisisRepo.analizarLectura()
+            UiUtils.showLoading(this@AlertsActivity, "Cargando alerta...")
 
-            if (analisisResult.success != null) {
-                // CASO 1: ÉXITO (Respuesta 200 OK)
-                val analisis = analisisResult.success
+            try {
+                val analisisResult = analisisRepo.analizarLectura()
 
-                // Aseguramos que solo se muestre si el backend indica alerta activa (alerta_ia == 1)
-                if (analisis.alerta_ia == 1) {
-                    // 🎯 CONSTRUIR EL MENSAJE COMPLETO CON TODA LA INFORMACIÓN IMPORTANTE
-                    val tipoEstado = analisis.tipo_estado ?: "Estado desconocido"
-                    val tipoAlerta = analisis.tipo_alerta_modelo ?: "Alerta general"
-                    val recomendacion = analisis.recomendacion ?: "Sin recomendaciones"
+                if (analisisResult.success != null) {
+                    // CASO 1: ÉXITO (Respuesta 200 OK)
+                    val analisis = analisisResult.success
 
-                    // 📝 Mostrar en la interfaz (TextView)
-                    val displayText = buildString {
-                        appendLine("-$tipoEstado")
-                        appendLine()
-                        appendLine("-Tipo de Alerta: $tipoAlerta")
-                        appendLine()
-                        appendLine("-Recomendación:")
-                        appendLine(recomendacion)
+                    // Aseguramos que solo se muestre si el backend indica alerta activa (alerta_ia == 1)
+                    if (analisis.alerta_ia == 1) {
+                        handleAlertData(analisis)
+                    } else {
+                        // Si el 200 OK no contiene alerta activa
+                        handleNoActiveAlerts()
                     }
-
-                    binding.iaResponseText.text = displayText
-
-                    // 🔊 Mensaje para reproducir por voz
-                    fullAlertMessage = buildString {
-                        append("Atención. ")
-                        append("$tipoEstado. ")
-                        append("Tipo de alerta: $tipoAlerta. ")
-                        append("Recomendación: ")
-                        append(recomendacion)
-                    }
-
-                    Log.d(TAG, "✅ Alerta cargada: $tipoEstado")
-
+                } else if (analisisResult.errorMessage != null) {
+                    // CASO 2: ERROR CONTROLADO
+                    handleError(analisisResult.errorMessage)
                 } else {
-                    // Si el 200 OK no contiene alerta activa (alerta_ia != 1)
-                    val fallbackMessage = "No hay alertas activas en este momento"
-                    binding.iaResponseText.text = fallbackMessage
-                    fullAlertMessage = fallbackMessage
-                    Log.w(TAG, "⚠️ Backend OK, pero no se detectó alerta activa")
-                    // Se podría cerrar la actividad aquí si se lanzó sin una alerta
+                    // CASO 3: Error de red o desconocido
+                    handleError("Error de conexión al cargar la alerta.")
                 }
-
-            } else if (analisisResult.errorMessage != null) {
-                // CASO 2: ERROR CONTROLADO (ej. 400 Bad Request con código 1001 o 1002)
-                val errorMessage = analisisResult.errorMessage
-
-                Log.e(TAG, "❌ Error controlado al cargar alerta: $errorMessage")
-
-                // Mostrar el error directamente al usuario
-                runOnUiThread {
-                    binding.iaResponseText.text = errorMessage
-                    fullAlertMessage = errorMessage
-                    Toast.makeText(this@AlertsActivity, errorMessage, Toast.LENGTH_LONG).show()
-                }
-
-            } else {
-                // CASO 3: Error de red o desconocido (errorMessage == null)
-                val fallbackMessage = "Error de conexión al cargar la alerta."
-
-                Log.e(TAG, "❌ Error desconocido al cargar alerta. Resultado nulo.")
-
-                runOnUiThread {
-                    binding.iaResponseText.text = fallbackMessage
-                    fullAlertMessage = fallbackMessage
-                    Toast.makeText(this@AlertsActivity, fallbackMessage, Toast.LENGTH_LONG).show()
-                }
-            }
-
-            // Iniciar la reproducción si hay un mensaje (ya sea de alerta o de error)
-            if (fullAlertMessage.isNotEmpty() && ttsReady) {
-                startSpeaking()
+            } catch (e: Exception) {
+                handleError("Error inesperado: ${e.message}")
+            } finally {
+                UiUtils.hideLoading()
             }
         }
     }
 
-    // ---------------------------------------------------------------------
-    //                      LÓGICA DE VOZ Y ONDAS
-    // ---------------------------------------------------------------------
+    private fun handleAlertData(analisis: com.sena.monitoreo.data.model.ai.AnalisisResponse) {
+        alertData = analisis
 
-    // ... (El resto de funciones loadVoiceConfiguration, initWaveformViews, setupWaveformSamples)
-    // ... (El resto de startSpeaking, stopSpeaking, startWaveformAnimation, speakText)
-    // ... (El resto de onInit, applyTtsSettings, setupMaleVoice, setupFemaleVoice, setupRoboticVoice, mapPitchValue)
-    // ... (El resto de onDestroy)
+        val tipoEstado = analisis.tipo_estado ?: "Estado desconocido"
+        val tipoAlerta = analisis.tipo_alerta_modelo ?: "Alerta general"
+        val recomendacion = analisis.recomendacion ?: "Sin recomendaciones"
 
-    private fun loadVoiceConfiguration() {
-        viewModel.loadCurrentConfig()
+        // 📝 Mostrar en la interfaz (TextView)
+        val displayText = buildString {
+            appendLine("-$tipoEstado")
+            appendLine()
+            appendLine("-Tipo de Alerta: $tipoAlerta")
+            appendLine()
+            appendLine("-Recomendación:")
+            appendLine(recomendacion)
+        }
 
-        viewModel.currentConfig.observe(this) { config ->
-            currentPitch = config.pitch
-            currentGender = config.gender
+        binding.iaResponseText.text = displayText
 
-            if (ttsReady) {
-                applyTtsSettings()
-            }
+        // 🔊 Mensaje para reproducir por voz - USANDO MÉTODO DE LA CLASE BASE
+        fullAlertMessage = formatAnalysisMessage(analisis)
+
+        Log.d(TAG, "✅ Alerta cargada: $tipoEstado")
+
+        // Reproducir automáticamente cuando la voz esté lista
+        if (isVoiceReady()) {
+            startAutoPlay()
         }
     }
 
-    private fun initWaveformViews() {
-        val waveformBinding = binding.waveformSection
+    private fun handleNoActiveAlerts() {
+        val fallbackMessage = "No hay alertas activas en este momento"
+        binding.iaResponseText.text = fallbackMessage
+        fullAlertMessage = fallbackMessage
+        Log.w(TAG, "⚠️ Backend OK, pero no se detectó alerta activa")
+    }
 
-        waveformSeekBar = waveformBinding.waveformSeekBar
-        btnPlay = waveformBinding.btnPlayMessage
-        setupWaveformSamples()
-
-        btnPlay.setOnClickListener {
-            if (!isSpeaking) {
-                // Esperar a que el mensaje esté cargado
-                if (fullAlertMessage.isNotEmpty()) {
-                    startSpeaking()
-                } else {
-                    Log.w(TAG, "⚠️ Esperando a que se cargue el mensaje...")
-                }
-            } else {
-                stopSpeaking()
-            }
+    private fun handleError(errorMessage: String) {
+        Log.e(TAG, "❌ Error al cargar alerta: $errorMessage")
+        runOnUiThread {
+            binding.iaResponseText.text = errorMessage
+            fullAlertMessage = errorMessage
+            UiUtils.showSnackbar(binding.root, errorMessage, true)
         }
     }
 
-    private fun setupWaveformSamples() {
-        val samples = IntArray(100) { Random.nextInt(10, 100) }
-        waveformSeekBar.setSampleFrom(samples)
-        waveformSeekBar.progress = 0f
-    }
-
-    private fun startSpeaking() {
-        if (tts?.isSpeaking == true || fullAlertMessage.isEmpty()) {
-            stopSpeaking()
-            return
+    override fun onVoiceInitialized() {
+        // Cuando la voz esté lista, reproducir automáticamente si hay mensaje
+        if (fullAlertMessage.isNotEmpty()) {
+            startAutoPlay()
         }
-
-        isSpeaking = true
-        btnPlay.setIconResource(R.drawable.ic_stop)
-
-        // 🔊 REPRODUCE EL MENSAJE COMPLETO (con recomendaciones o el error)
-        speakText(fullAlertMessage)
-        startWaveformAnimation(fullAlertMessage.length)
-
-        Log.d(TAG, "🔊 Reproduciendo alerta o mensaje de error: $fullAlertMessage")
     }
 
-    private fun stopSpeaking() {
-        tts?.stop()
-        isSpeaking = false
-        btnPlay.setIconResource(R.drawable.ic_play)
-        waveformSeekBar.progress = 0f
-    }
-
-    private fun startWaveformAnimation(textLength: Int) {
+    private fun startAutoPlay() {
+        // Pequeño delay para mejor UX
         lifecycleScope.launch {
-            val estimatedDurationMs = (textLength * 80).toLong().coerceAtLeast(3000L)
-            val steps = estimatedDurationMs / 50L
-            val progressStep = waveformSeekBar.maxProgress / steps.toFloat()
-
-            for (i in 0 until steps.toInt()) {
-                if (!isSpeaking) break
-
-                waveformSeekBar.progress += progressStep
-
-                val dynamicSamples = IntArray(100) { Random.nextInt(5, 95) }
-                waveformSeekBar.setSampleFrom(dynamicSamples)
-
-                delay(50L)
-            }
-            if (isSpeaking) stopSpeaking()
+            kotlinx.coroutines.delay(500)
+            startSpeaking()
         }
     }
 
-    private fun speakText(text: String) {
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "TTS_ID")
-    }
+    override fun startSpeaking() {
+        super.startSpeaking()
 
-    // ---------------------------------------------------------------------
-    //                      CONFIGURACIÓN TTS
-    // ---------------------------------------------------------------------
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            ttsReady = true
-            applyTtsSettings()
-
-            // 🔊 Reproducir automáticamente cuando esté listo (solo si el mensaje ya fue cargado)
-            if (fullAlertMessage.isNotEmpty()) {
-                // No necesitamos el delay aquí si fullAlertMessage ya tiene contenido
-                // Si tienes problemas de concurrencia, puedes descomentar el delay.
-                startSpeaking()
-            }
-        } else {
-            Log.e(TAG, "Error con TextToSpeech: $status")
-            btnPlay.isEnabled = false
+        if (alertData != null) {
+            // 🔊 USAR MÉTODO MEJORADO CON WAVEFORM CONTINUO
+            val fullMessage = formatAnalysisMessage(alertData!!)
+            speakLongTextWithContinuousWaveform(fullMessage)
+            Log.d(TAG, "🔊 Reproduciendo mensaje largo con waveform continuo: ${fullMessage.length} caracteres")
+        } else if (fullAlertMessage.isNotEmpty()) {
+            // Mensaje simple del intent - también usar método continuo
+            speakLongTextWithContinuousWaveform(fullAlertMessage)
+            Log.d(TAG, "🔊 Reproduciendo mensaje del intent con waveform continuo: ${fullAlertMessage.length} caracteres")
         }
     }
 
-    private fun applyTtsSettings() {
-        if (tts == null || !ttsReady) return
-
-        val locale = Locale("es", "ES")
-        val result = tts?.setLanguage(locale)
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.e(TAG, "Idioma de TTS no compatible. Instale voces en español")
-            btnPlay.isEnabled = false
-            return
-        }
-
-        when (currentGender.uppercase()) {
-            "MALE" -> setupMaleVoice(locale)
-            "FEMALE" -> setupFemaleVoice(locale)
-            "ROBOTIC" -> setupRoboticVoice()
-            else -> setupFemaleVoice(locale)
-        }
-
-        tts?.setPitch(mapPitchValue(currentPitch))
-        btnPlay.isEnabled = true
-    }
-
-    private fun setupMaleVoice(locale: Locale) {
-        tts?.voices?.find {
-            it.locale.language == "es" &&
-                    preferredMaleVoices.any { pref -> it.name.contains(pref, true) }
-        }?.let {
-            tts?.voice = it
-            return
-        }
-        tts?.setPitch(0.8f)
-        tts?.setSpeechRate(0.9f)
-    }
-
-    private fun setupFemaleVoice(locale: Locale) {
-        tts?.voices?.find {
-            it.locale.language == "es" &&
-                    preferredFemaleVoices.any { pref -> it.name.contains(pref, true) }
-        }?.let {
-            tts?.voice = it
-            return
-        }
-        tts?.setPitch(1.1f)
-        tts?.setSpeechRate(1.0f)
-    }
-
-    private fun setupRoboticVoice() {
-        val locale = Locale("es", "ES")
-        tts?.voices?.find { it.locale.language == "es" }?.let {
-            tts?.voice = it
-        }
-        tts?.setPitch(0.3f)
-        tts?.setSpeechRate(0.75f)
-    }
-
-    private fun mapPitchValue(value: Float): Float {
-        return when (value) {
-            0.8f -> 0.6f
-            1.0f -> 1.0f
-            1.3f -> 1.6f
-            else -> value.coerceIn(0.5f, 2.0f)
-        }
+    override fun onBackPressed() {
+        stopSpeaking()
+        super.onBackPressed()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        tts?.stop()
-        tts?.shutdown()
+        // AlertManager no necesita stop aquí ya que no iniciamos verificación periódica
+    }
+
+    companion object {
+        private const val TAG = "AlertsActivity"
     }
 }

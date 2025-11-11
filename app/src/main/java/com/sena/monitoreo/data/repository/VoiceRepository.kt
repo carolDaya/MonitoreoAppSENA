@@ -5,23 +5,17 @@ import com.sena.monitoreo.data.api.ApiVoice
 
 class VoiceRepository(private val apiService: ApiVoice) {
 
-    /**
-     * Obtiene la configuración de voz del backend.
-     */
     suspend fun getVoiceConfig(): VoiceResponse {
         return try {
             apiService.fetchVoiceConfig()
         } catch (e: Exception) {
-            // Valor por defecto en caso de fallo
+            // Valor por defecto en caso de error
             VoiceResponse(gender = "FEMALE", pitch = 1.0f)
         }
     }
 
-    /**
-     * Guarda la configuración de voz en el backend.
-     */
     suspend fun saveVoiceConfig(gender: String, pitch: Float) {
-        val configToSend = VoiceResponse(gender = gender, pitch = pitch)
-        apiService.saveVoiceConfig(configToSend)
+        val config = VoiceResponse(gender = gender, pitch = pitch)
+        apiService.saveVoiceConfig(config)
     }
 }
