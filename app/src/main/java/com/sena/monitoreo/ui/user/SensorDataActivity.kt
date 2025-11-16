@@ -178,6 +178,7 @@ class SensorDataActivity : BaseVoiceActivity() {
             val configuraciones = graficasRepo.getGraficas()
 
             if (configuraciones.isEmpty()) {
+                // Si no hay configuraciones, mostrar el estado (inactivo/esperando datos)
                 showDefaultCharts(hayProcesoActivo)
             } else {
                 configuraciones.forEach { config ->
@@ -196,6 +197,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                         else -> return@forEach
                     }
 
+                    // 3️⃣ Cargar lecturas (solo si el proceso está activo)
                     val lecturas = if (hayProcesoActivo) {
                         lecturaRepo.getLecturas(sensorId)
                     } else {
@@ -203,11 +205,13 @@ class SensorDataActivity : BaseVoiceActivity() {
                     }
 
                     if (lecturas.isNotEmpty()) {
+                        // Mostrar datos REALES
                         val entries = lecturas.mapIndexed { index, lectura ->
                             Entry(index.toFloat(), lectura.valor.toFloat())
                         }
                         chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
                     } else {
+                        // Mostrar mensaje de estado: Proceso Inactivo o Esperando datos
                         showNoDataChart(cardView, nombreSensor, hayProcesoActivo)
                     }
                 }
@@ -239,7 +243,7 @@ class SensorDataActivity : BaseVoiceActivity() {
         val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
         titleTextView?.text = sensorName
 
-        // Ocultar todas las gráficas
+        // Ocultar todas las gráficas de MikePhil
         cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
         cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
         cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
@@ -263,27 +267,15 @@ class SensorDataActivity : BaseVoiceActivity() {
         chartContainer?.addView(textView)
     }
 
+    /**
+     * CORRECCIÓN: Esta función ahora solo muestra mensajes de estado.
+     * Se han ELIMINADO los datos falsos (mock entries) que se cargaban.
+     */
     @RequiresApi(Build.VERSION_CODES.O)
     private fun showDefaultCharts(hayProcesoActivo: Boolean) {
-        if (hayProcesoActivo) {
-            val entriesTemp = listOf(Entry(1f, 25f), Entry(2f, 26f), Entry(3f, 28f))
-            val entriesPresion = listOf(Entry(1f, 990f), Entry(2f, 1000f), Entry(3f, 1010f))
-            val entriesMetano = listOf(Entry(1f, 0.05f), Entry(2f, 0.06f), Entry(3f, 0.07f))
-
-            chartManager.displayChart("line", binding.cardTemperatura.root, "Temperatura",
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(2) else getLegacySensorColor(2),
-                entriesTemp, 2)
-            chartManager.displayChart("bar", binding.cardPresion.root, "Presión",
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(3) else getLegacySensorColor(3),
-                entriesPresion, 3)
-            chartManager.displayChart("pie", binding.cardMq4.root, "Metano",
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) chartManager.getSensorColor(1) else getLegacySensorColor(1),
-                entriesMetano, 1)
-        } else {
-            showNoDataChart(binding.cardTemperatura.root, "Temperatura", false)
-            showNoDataChart(binding.cardPresion.root, "Presión", false)
-            showNoDataChart(binding.cardMq4.root, "Metano", false)
-        }
+        showNoDataChart(binding.cardTemperatura.root, "Temperatura", hayProcesoActivo)
+        showNoDataChart(binding.cardPresion.root, "Presión", hayProcesoActivo)
+        showNoDataChart(binding.cardMq4.root, "Metano", hayProcesoActivo)
     }
 
     private fun getLegacySensorColor(sensorId: Int): Int = when (sensorId) {
