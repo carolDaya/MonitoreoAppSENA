@@ -4,8 +4,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    private const val BASE_URL_AUTH = "http://10.0.2.2:5000/auth/"
-    private const val BASE_URL_API = "http://10.0.2.2:5000/api/"
+    private const val BASE_URL_AUTH = "http://200.234.235.149:5000/auth/"
+    private const val BASE_URL_API = "http://200.234.235.149:5000/api/"
 
     // Instancia compartida de Retrofit para rutas API (no-auth)
     private val retrofitApi: Retrofit by lazy {
@@ -55,6 +55,7 @@ object RetrofitClient {
     val apiAi: ApiAiService by lazy {
         retrofitApi.create(ApiAiService::class.java)
     }
+
     val apiVoice: ApiVoice by lazy {
         retrofitApi.create(ApiVoice::class.java)
     }
