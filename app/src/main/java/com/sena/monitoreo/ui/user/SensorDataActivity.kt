@@ -191,8 +191,8 @@ class SensorDataActivity : BaseVoiceActivity() {
                     }
 
                     val (nombreSensor, cardView) = when (sensorId) {
-                        2 -> "Temperatura" to binding.cardTemperatura.root
-                        3 -> "Presión" to binding.cardPresion.root
+                        3 -> "Temperatura" to binding.cardTemperatura.root
+                        2 -> "Presión" to binding.cardPresion.root
                         1 -> "Metano" to binding.cardMq4.root
                         else -> return@forEach
                     }
