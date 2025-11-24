@@ -3,12 +3,15 @@ package com.sena.monitoreo.data.model.auth
 import com.google.gson.annotations.SerializedName
 
 data class LoginResponse(
-    @SerializedName("usuario")
-    val usuario: String,
-
-    @SerializedName("rol")
+    val id: Int,
+    val nombre: String,
+    val telefono: String,
     val rol: String,
+    val estado: String,
+    val conectado: Boolean,
 
-    @SerializedName("token")
-    val token: String?
+    @SerializedName("ultima_conexion")
+    val ultimaConexion: String?,
+
+    val message: String?
 )

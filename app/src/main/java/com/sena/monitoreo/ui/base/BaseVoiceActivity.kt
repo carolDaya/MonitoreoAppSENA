@@ -2,17 +2,24 @@ package com.sena.monitoreo.ui.base
 
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.masoudss.lib.WaveformSeekBar
 import com.sena.monitoreo.R
 import com.sena.monitoreo.data.model.ai.AnalisisResponse
+import com.sena.monitoreo.utils.NetworkRetryListener // Importar la interfaz
 import com.sena.monitoreo.utils.voice.VoiceManager
 import com.sena.monitoreo.utils.voice.WaveformManager
 import kotlinx.coroutines.launch
 
-abstract class BaseVoiceActivity : AppCompatActivity() {
+/**
+ * Clase base para Activities que requieren inicialización y gestión del motor de voz (TTS).
+ * Hereda de BaseActivity para obtener el manejo de errores de red.
+ */
+abstract class BaseVoiceActivity : BaseActivity() {
 
     protected lateinit var voiceManager: VoiceManager
     protected lateinit var waveformManager: WaveformManager

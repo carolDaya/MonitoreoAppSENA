@@ -3,6 +3,7 @@ package com.sena.monitoreo.ui.admin
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.ViewModelProvider
@@ -12,29 +13,28 @@ import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.repository.ProcesoRepository
 import com.sena.monitoreo.data.repository.VoiceRepository
 import com.sena.monitoreo.databinding.ActivityHomeAdminBinding
-import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModel
-import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModelFactory
 import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModel
-import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModelFactory
+import com.sena.monitoreo.ui.admin.factory.ProcesoViewModelFactory
+import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
+import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
+import com.sena.monitoreo.utils.NetworkRetryListener
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.navigation.NavigationManager
 import com.sena.monitoreo.utils.proceso.ProcesoManager
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class HomeAdminActivity : BaseVoiceActivity() {
+class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
 
     private lateinit var binding: ActivityHomeAdminBinding
     private lateinit var navigationManager: NavigationManager
     private lateinit var procesoManager: ProcesoManager
 
-
-    // ViewModels
-    private val viewModel: AdminConfigViewModel by lazy {
+    private val voiceConfigViewModel: VoiceConfigViewModel by lazy {
         val repository = VoiceRepository(RetrofitClient.apiVoice)
-        ViewModelProvider(this, AdminConfigViewModelFactory(repository))
-            .get(AdminConfigViewModel::class.java)
+        ViewModelProvider(this, VoiceConfigViewModelFactory(repository))
+            .get(VoiceConfigViewModel::class.java)
     }
 
     private val procesoViewModel: ProcesoViewModel by lazy {
@@ -49,10 +49,25 @@ class HomeAdminActivity : BaseVoiceActivity() {
         binding = ActivityHomeAdminBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupNavigation() // ✅ PRIMERO CONFIGURAR NAVEGACIÓN
+        // Configurar manejo de errores de red
+        setupNetworkErrorHandling(binding.root as ViewGroup, this)
+
+        setupNavigation()
         setupVoiceConfiguration()
         setupProcesoControl()
 
+        // 💡 CORRECCIÓN: Cargar estado del proceso al iniciar
+        lifecycleScope.launch {
+            procesoViewModel.loadProcesoStatus()
+        }
+    }
+
+    override fun onNetworkRetry() {
+        Log.d(TAG, "🔄 Reintentando carga en HomeAdmin...")
+        lifecycleScope.launch {
+            procesoViewModel.loadProcesoStatus()
+            voiceConfigViewModel.loadCurrentConfig()
+        }
     }
 
     private fun setupNavigation() {
@@ -65,30 +80,52 @@ class HomeAdminActivity : BaseVoiceActivity() {
         )
 
         binding.mainHeader.settingsIcon.setOnClickListener {
-            binding.homeAdmin.openDrawer(GravityCompat.START)
+            if (binding.homeAdmin.isDrawerOpen(GravityCompat.START)) {
+                binding.homeAdmin.closeDrawer(GravityCompat.START)
+            } else {
+                binding.homeAdmin.openDrawer(GravityCompat.START)
+            }
         }
 
-        navigationManager.setupAdminNavigation("home_admin")
+        navigationManager.setupNavigation("home_admin")
     }
 
     private fun setupVoiceConfiguration() {
-        // Configurar waveform components usando el método de la clase base
         setupWaveformComponents(
             binding.mainHeader.waveformSection.waveformSeekBar,
             binding.mainHeader.waveformSection.btnPlayMessage
         )
 
-        viewModel.loadCurrentConfig()
-        viewModel.currentConfig.observe(this) { config ->
-            voiceManager.currentPitch = config.pitch
-            voiceManager.currentGender = config.gender
-            if (isVoiceInitialized) {
-                voiceManager.applyTtsSettings()
+        voiceConfigViewModel.loadCurrentConfig()
 
-                // Reproducir mensaje de prueba cuando se actualiza la configuración
-                lifecycleScope.launch {
-                    delay(500)
-                    speakWithWaveform("Configuración de voz actualizada")
+        // 💡 CORRECCIÓN: Observar VoiceConfigViewModel simplificado
+        lifecycleScope.launch {
+            voiceConfigViewModel.currentConfig.collectLatest { config ->
+                voiceManager.currentPitch = config.voicePitch.toFloat()
+                voiceManager.currentGender = config.voiceGender
+
+                if (isVoiceInitialized) {
+                    voiceManager.applyTtsSettings()
+                }
+            }
+        }
+
+        // 💡 CORRECCIÓN: Manejo de errores de voz simplificado
+        lifecycleScope.launch {
+            voiceConfigViewModel.uiState.collectLatest { state ->
+                when (state) {
+                    is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
+                        if (state.message.contains("Error de red", ignoreCase = true) ||
+                            state.message.contains("IOException", ignoreCase = true)) {
+                            showNetworkError(state.message)
+                        }
+                    }
+                    VoiceConfigViewModel.VoiceConfigUiState.Success -> {
+                        if (isNetworkErrorVisible()) {
+                            hideNetworkError()
+                        }
+                    }
+                    else -> {}
                 }
             }
         }
@@ -106,13 +143,29 @@ class HomeAdminActivity : BaseVoiceActivity() {
             progressBar = cardBinding.procesoProgressBar,
             lifecycleOwner = this,
             onStatusUpdate = { message ->
-                UiUtils.showSnackbar(binding.root, message)
-                // Opcional: también reproducir por voz
-                speakWithWaveform(message)
+                // Solo mostrar Snackbar y hablar si no hay error de red
+                if (!isNetworkErrorVisible()) {
+                    UiUtils.showSnackbar(binding.root, message)
+                    speakWithWaveform(message)
+                }
             }
         )
 
         procesoManager.setupProcesoControl()
+
+        // 💡 CORRECCIÓN: Observar el estado del proceso para manejar errores de red
+        procesoViewModel.procesoStatus.observe(this) { mensaje ->
+            if (mensaje.contains("Error de red", ignoreCase = true) ||
+                mensaje.contains("IOException", ignoreCase = true)) {
+                showNetworkError(mensaje)
+            } else if (mensaje.contains("correctamente", ignoreCase = true) ||
+                mensaje.contains("cargado", ignoreCase = true)) {
+                // Ocultar error si la operación fue exitosa
+                if (isNetworkErrorVisible()) {
+                    hideNetworkError()
+                }
+            }
+        }
     }
 
     private fun navigateToAdminDashboard(section: String? = null) {
@@ -125,14 +178,17 @@ class HomeAdminActivity : BaseVoiceActivity() {
     }
 
     override fun onVoiceInitialized() {
-        // Configuración adicional cuando la voz esté lista
-        Log.d(TAG, "Voz inicializada en HomeAdmin")
+        Log.d(TAG, "🎙️ Voz inicializada en HomeAdmin")
 
-        // Verificar si hay configuración de voz cargada
-        viewModel.currentConfig.value?.let { config ->
-            voiceManager.currentPitch = config.pitch
-            voiceManager.currentGender = config.gender
+        voiceConfigViewModel.currentConfig.value.let { config ->
+            voiceManager.currentPitch = config.voicePitch.toFloat()
+            voiceManager.currentGender = config.voiceGender
             voiceManager.applyTtsSettings()
+        }
+
+        // Solo iniciar speaking si no hay error de red
+        if (!isNetworkErrorVisible()) {
+            startSpeaking()
         }
     }
 

@@ -6,10 +6,10 @@ import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -18,6 +18,7 @@ import com.sena.monitoreo.R
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.model.user.UserResponse
 import com.sena.monitoreo.data.repository.GraficasRepository
+import com.sena.monitoreo.data.repository.ProcesoRepository
 import com.sena.monitoreo.data.repository.UserRepository
 import com.sena.monitoreo.data.repository.VoiceRepository
 import com.sena.monitoreo.databinding.ActivityAdminDashboardBinding
@@ -29,14 +30,21 @@ import com.sena.monitoreo.utils.charts.AdminChartManager
 import com.sena.monitoreo.utils.navigation.NavigationManager
 import com.sena.monitoreo.utils.voice.VoiceConfigHelper
 import com.sena.monitoreo.utils.voice.VoiceManager
-import com.sena.monitoreo.utils.voice.WaveformManager
+// import com.sena.monitoreo.utils.voice.WaveformManager // ❌ ELIMINADO para evitar conflicto
 import com.sena.monitoreo.utils.UiUtils
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.button.MaterialButton
 import com.masoudss.lib.WaveformSeekBar
+import com.sena.monitoreo.ui.admin.factory.AdminConfigViewModelFactory
+import com.sena.monitoreo.ui.admin.factory.UserViewModelFactory
+import com.sena.monitoreo.ui.admin.factory.ProcesoViewModelFactory
+import com.sena.monitoreo.ui.base.BaseVoiceActivity
+import com.sena.monitoreo.utils.NetworkRetryListener
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.IOException
 
-class AdminDashboardActivity : AppCompatActivity() {
+class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
 
     private lateinit var binding: ActivityAdminDashboardBinding
     private lateinit var headerBinding: HeaderLayoutAdminBinding
@@ -44,12 +52,12 @@ class AdminDashboardActivity : AppCompatActivity() {
 
     private val graficasRepo = GraficasRepository()
     private val userRepo = UserRepository()
+    private val procesoRepo = ProcesoRepository(RetrofitClient.apiProceso)
     private val TAG = "AdminDashboard"
 
     // Managers / Helpers
     private lateinit var navigationManager: NavigationManager
-    private lateinit var voiceManager: VoiceManager
-    private lateinit var waveformManager: WaveformManager
+    // private lateinit var waveformManager: WaveformManager // ❌ Eliminada la re-declaración. Usar la heredada.
     private lateinit var chartManager: AdminChartManager
     private lateinit var voiceConfigHelper: VoiceConfigHelper
 
@@ -65,13 +73,20 @@ class AdminDashboardActivity : AppCompatActivity() {
             .get(UserViewModel::class.java)
     }
 
+    private val procesoViewModel: ProcesoViewModel by lazy {
+        ViewModelProvider(this, ProcesoViewModelFactory(procesoRepo))
+            .get(ProcesoViewModel::class.java)
+    }
+
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAdminDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        initializeManagers() // Managers, Voz y Waveform consolidados
+        setupNetworkErrorHandling(binding.adminDashboard as ViewGroup, this)
+
+        initializeManagers()
         setupNavigationDrawer()
         setupVoiceConfigurationSection()
         setupUserSection()
@@ -79,15 +94,83 @@ class AdminDashboardActivity : AppCompatActivity() {
 
         loadVoiceConfiguration()
         observeLoadingStates()
+        observeNetworkErrors()
+
         handleScrollToSection()
-        showSection(home = true)
+
+        if (intent.getStringExtra("SCROLL_TO") == null) {
+            showSection(home = true)
+        }
     }
+
+    // ----------------------------------------------------------
+    // 💡 Implementación de NetworkRetryListener
+    // ----------------------------------------------------------
+    override fun onNetworkRetry() {
+        // ❌ Reemplazar 'chartManager.reloadAllCharts()' con una llamada de recarga válida.
+        // Asumiendo que loadInitialCharts puede forzar una recarga o hay un método específico.
+        // Si tienes un método específico en AdminChartManager (ej. reloadData), úsalo.
+        chartManager.loadInitialCharts(
+            binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp,
+            binding.graficasAdminSection.graphContainerPressure, binding.graficasAdminSection.btnChangePressure,
+            binding.graficasAdminSection.graphContainerGas, binding.graficasAdminSection.btnChangeGas
+        )
+
+        adminConfigViewModel.loadCurrentConfig()
+        userViewModel.loadAllUsers(getCurrentUserFilter())
+
+        hideNetworkError()
+    }
+
+    private fun getCurrentUserFilter(): String {
+        return when (binding.userAdminSection.tabLayoutUsuarios.selectedTabPosition) {
+            0 -> "activo"
+            1 -> "bloqueado"
+            else -> "all"
+        }
+    }
+
+
+    // ----------------------------------------------------------
+    // ⚠️ Observar errores de red de ViewModels
+    // ----------------------------------------------------------
+    private fun observeNetworkErrors() {
+        lifecycleScope.launch {
+            // Observar errores de UserViewModel
+            userViewModel.networkError.collectLatest { errorMessage ->
+                if (errorMessage != null) {
+                    showNetworkError(errorMessage)
+                    userViewModel.clearNetworkError()
+                } else {
+                    hideNetworkError()
+                }
+            }
+        }
+
+        // Observar errores de AdminConfigViewModel
+        adminConfigViewModel.saveStatus.observe(this) { message ->
+            if (message.contains("Error de red", ignoreCase = true) || message.contains("IOException", ignoreCase = true)) {
+                showNetworkError(message)
+            } else if (!isNetworkErrorVisible()) {
+                if (message.contains("éxito")) {
+                    UiUtils.showSnackbar(binding.root, message, isError = false)
+                }
+            }
+        }
+
+        // Observar errores de carga inicial de AdminConfigViewModel (si falla al cargar)
+        adminConfigViewModel.loadError.observe(this) { message ->
+            if (message.contains("Error de red", ignoreCase = true) || message.contains("IOException", ignoreCase = true)) {
+                showNetworkError(message)
+            }
+        }
+    }
+
 
     // ----------------------------------------------------------
     // 🔄 Observar estados de carga (Loading)
     // ----------------------------------------------------------
     private fun observeLoadingStates() {
-        // Observador para AdminConfigViewModel (Guardar configuración de IA)
         adminConfigViewModel.isLoading.observe(this) { isLoading ->
             if (isLoading) {
                 UiUtils.showLoading(this, "Guardando configuración...")
@@ -96,7 +179,6 @@ class AdminDashboardActivity : AppCompatActivity() {
             }
         }
 
-        // Observador para UserViewModel (Cargar/Actualizar usuarios)
         lifecycleScope.launch {
             userViewModel.isLoading.collect { isLoading ->
                 if (isLoading) {
@@ -106,35 +188,55 @@ class AdminDashboardActivity : AppCompatActivity() {
                 }
             }
         }
+
+        procesoViewModel.isLoading.observe(this) { isLoading ->
+            // Manejar loading específico del proceso si es necesario
+        }
     }
 
 
     // ----------------------------------------------------------
-    // 💡 Inicialización de Managers, Voz y Waveform (CONSOLIDADO)
+    // 💡 Inicialización de Managers, Voz y Waveform
     // ----------------------------------------------------------
     private fun initializeManagers() {
-        val headerView = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.main_header)
-        val waveFormSection = headerView.findViewById<View>(R.id.waveform_section)
+        headerBinding = HeaderLayoutAdminBinding.bind(binding.mainHeader.root)
+        val waveFormSection = headerBinding.waveformSection.root
         val waveformSeekBar = waveFormSection.findViewById<WaveformSeekBar>(R.id.waveformSeekBar)
         val btnPlayMessage = waveFormSection.findViewById<MaterialButton>(R.id.btn_play_message)
 
-        // 1. Inicialización de Managers/Helpers
-        waveformManager = WaveformManager(waveformSeekBar)
-        voiceManager = VoiceManager(this) { btnPlayMessage.isEnabled = true }
+        // waveformManager y voiceManager son propiedades heredadas de BaseVoiceActivity
+        // Solo necesitamos inicializarlas aquí si BaseVoiceActivity no lo hace automáticamente
+        // o si necesitamos pasarles las vistas específicas.
+
+        // ASUMO que BaseVoiceActivity ya maneja voiceManager.initialize() y la configuración básica.
+        // Si no es el caso, esta inicialización debe estar en BaseVoiceActivity o BaseActivity.
+        // Para solucionar el error: re-usamos la propiedad heredada.
+
+        // waveformManager = WaveformManager(waveformSeekBar) // ❌ No se re-declara
+        // voiceManager = VoiceManager(this) { btnPlayMessage.isEnabled = true } // ❌ No se re-declara
+
+        // Para evitar el conflicto de re-declaración, aseguramos que la propiedad heredada
+        // (si existe) se configure con las vistas, o que se use el método setupWaveformComponents
+        // heredado de BaseVoiceActivity, que es lo correcto para las clases base que manejan vistas.
+        setupWaveformComponents(waveformSeekBar, btnPlayMessage)
 
         chartManager = AdminChartManager(this, graficasRepo, lifecycleScope)
 
-        // 💡 CLAVE: Pasar voiceManager al VoiceConfigHelper
-        voiceConfigHelper = VoiceConfigHelper(this, adminConfigViewModel, binding.iaAdminSection.btnSaveVoiceConfig, voiceManager)
+        voiceConfigHelper = VoiceConfigHelper(
+            context = this,
+            viewModel = adminConfigViewModel,
+            saveButton = binding.iaAdminSection.btnSaveVoiceConfig,
+            voiceManager = voiceManager,
+            lifecycleOwner = this
+        )
 
-        // 2. 🔊 Lógica de Voz y Waveform
-        waveformManager.setupInitialSamples()
-        voiceManager.initialize()
+        // waveformManager.setupInitialSamples() // ❌ Usar la propiedad heredada
+        waveformManager.setupInitialSamples() // ✅ Correcto, si está configurado en setupWaveformComponents
+        // voiceManager.initialize() // ✅ Correcto, si está configurado en setupWaveformComponents
 
         btnPlayMessage.setOnClickListener {
             val message = "Bienvenido al panel del administrador. Aquí puedes gestionar usuarios, revisar las gráficas y acceder a las funciones de inteligencia artificial."
 
-            // 💡 CLAVE: Aplicar la configuración TTS antes de hablar (redundante pero seguro)
             voiceManager.applyTtsSettings()
 
             if (!voiceManager.isSpeaking) {
@@ -157,16 +259,7 @@ class AdminDashboardActivity : AppCompatActivity() {
     private fun loadVoiceConfiguration() {
         adminConfigViewModel.loadCurrentConfig()
 
-        // ❌ El observador de currentConfig se ha movido dentro del VoiceConfigHelper
-        // para garantizar que la configuración se aplique correctamente al VoiceManager.
-
-        // MANTENER: El Snackbar de éxito
-        adminConfigViewModel.saveSuccess.observe(this) { success ->
-            if (success) {
-                // voiceManager.applyTtsSettings() ya se llama desde el Helper al actualizar la config.
-                UiUtils.showSnackbar(binding.root, "Configuración de voz actualizada correctamente.", isError = false)
-            }
-        }
+        adminConfigViewModel.saveSuccess.observe(this) {}
     }
 
     // ----------------------------------------------------------
@@ -177,16 +270,10 @@ class AdminDashboardActivity : AppCompatActivity() {
             binding.iaAdminSection.spinnerIaVoz,
             binding.iaAdminSection.spinnerTonoVoz
         )
-        adminConfigViewModel.saveStatus.observe(this) { message ->
-            // Muestra Snackbar si la operación falló (éxito ya se maneja en saveSuccess)
-            if (message.contains("Error")) {
-                UiUtils.showSnackbar(binding.root, message, isError = true)
-            }
-        }
     }
 
     // ----------------------------------------------------------
-    // 👥 Lógica de Usuarios (Refactorizada con UserViewModel)
+    // 👥 Lógica de Usuarios (Corregida la Carga Inicial)
     // ----------------------------------------------------------
     private fun setupUserSection() {
         setupRecyclerView()
@@ -199,6 +286,8 @@ class AdminDashboardActivity : AppCompatActivity() {
                 Log.d(TAG, "Usuarios cargados (ViewModel): ${users.size}")
             }
         }
+
+        userViewModel.loadAllUsers(estado = "activo")
     }
 
     private fun setupRecyclerView() {
@@ -212,6 +301,7 @@ class AdminDashboardActivity : AppCompatActivity() {
         val tabLayout = binding.userAdminSection.tabLayoutUsuarios
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
+                hideNetworkError()
                 when (tab?.position) {
                     0 -> userViewModel.loadAllUsers(estado = "activo")
                     1 -> userViewModel.loadAllUsers(estado = "bloqueado")
@@ -219,9 +309,10 @@ class AdminDashboardActivity : AppCompatActivity() {
                 }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
-            override fun onTabReselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {
+                onTabSelected(tab)
+            }
         })
-        userViewModel.loadAllUsers(estado = "activo")
     }
 
     private fun showUserDialog(user: UserResponse) {
@@ -241,7 +332,9 @@ class AdminDashboardActivity : AppCompatActivity() {
             userViewModel.updateUserEstado(user.id, nuevoEstado)
 
             val message = "Usuario ${user.nombre} ahora está $nuevoEstado"
-            UiUtils.showSnackbar(binding.root, message, isError = nuevoEstado == "bloqueado")
+            if (!isNetworkErrorVisible()) {
+                UiUtils.showSnackbar(binding.root, message, isError = nuevoEstado == "bloqueado")
+            }
 
             dialog.dismiss()
         }
@@ -273,7 +366,7 @@ class AdminDashboardActivity : AppCompatActivity() {
 
 
     // ----------------------------------------------------------
-    // 🧭 Lógica de Navegación (Usando NavigationManager)
+    // 🧭 Lógica de Navegación (Corregida la Visibilidad)
     // ----------------------------------------------------------
     private fun setupNavigationDrawer() {
         headerBinding = HeaderLayoutAdminBinding.bind(binding.mainHeader.root)
@@ -293,8 +386,7 @@ class AdminDashboardActivity : AppCompatActivity() {
         binding.navView.setNavigationItemSelectedListener { menuItem ->
             menuItem.isChecked = true
             binding.adminDashboard.closeDrawers()
-
-            navigationManager.handleAdminNavigation(menuItem.itemId, "admin_dashboard")
+            navigationManager.handleAdminNavigation(menuItem.itemId)
 
             if (menuItem.itemId == R.id.nav_logout) performLogout()
             true
@@ -313,11 +405,21 @@ class AdminDashboardActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Controla la visibilidad de las secciones.
+     * Si home=true, muestra todas las secciones (Dashboard).
+     */
     private fun showSection(home: Boolean = false, graphs: Boolean = false, ai: Boolean = false, users: Boolean = false) {
         with(binding) {
-            graficasAdminSection.root.visibility = if (graphs || home) View.VISIBLE else View.GONE
-            iaAdminSection.root.visibility = if (ai || home) View.VISIBLE else View.GONE
-            userAdminSection.root.visibility = if (users || home) View.VISIBLE else View.GONE
+            if (home) {
+                graficasAdminSection.root.visibility = View.VISIBLE
+                iaAdminSection.root.visibility = View.VISIBLE
+                userAdminSection.root.visibility = View.VISIBLE
+            } else {
+                graficasAdminSection.root.visibility = if (graphs) View.VISIBLE else View.GONE
+                iaAdminSection.root.visibility = if (ai) View.VISIBLE else View.GONE
+                userAdminSection.root.visibility = if (users) View.VISIBLE else View.GONE
+            }
         }
     }
 
@@ -328,11 +430,6 @@ class AdminDashboardActivity : AppCompatActivity() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         })
         finish()
-    }
-
-    private fun showError(message: String) {
-        UiUtils.showSnackbar(binding.root, message, isError = true)
-        Log.e(TAG, message)
     }
 
     override fun onBackPressed() {

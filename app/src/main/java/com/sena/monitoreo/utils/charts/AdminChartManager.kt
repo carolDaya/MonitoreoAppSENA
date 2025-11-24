@@ -1,24 +1,19 @@
-// com.sena.monitoreo.utils.charts.AdminChartManager.kt
-
 package com.sena.monitoreo.utils.charts
 
 import android.content.Context
 import android.os.Build
-import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
-import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleCoroutineScope
-import com.github.mikephil.charting.charts.BarChart
-import com.github.mikephil.charting.charts.Chart
-import com.github.mikephil.charting.charts.LineChart
-import com.github.mikephil.charting.charts.PieChart
+import com.github.mikephil.charting.charts.*
 import com.github.mikephil.charting.data.*
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.sena.monitoreo.R
 import com.sena.monitoreo.data.repository.GraficasRepository
+import com.sena.monitoreo.utils.ResultWrapper
 import kotlinx.coroutines.launch
 
 class AdminChartManager(
@@ -27,58 +22,70 @@ class AdminChartManager(
     private val lifecycleScope: LifecycleCoroutineScope
 ) {
 
+    companion object {
+        private const val SENSOR_METANO = 1
+        private const val SENSOR_TEMPERATURA = 2
+        private const val SENSOR_PRESION = 3
+    }
+
     // --- DATOS FALSOS PARA CONFIGURACIÓN ---
     private fun getFakeEntries(sensorId: Int): List<Entry> {
         return when (sensorId) {
-            // Temperatura (2) - Valores de 20 a 30
-            2 -> listOf(Entry(1f, 22f), Entry(2f, 25f), Entry(3f, 28f), Entry(4f, 27f))
-            // Presión (3) - Valores de 980 a 1020
-            3 -> listOf(Entry(1f, 990f), Entry(2f, 1005f), Entry(3f, 1015f), Entry(4f, 1000f))
-            // Metano (1) - Valores de 0.01 a 0.10
-            1 -> listOf(Entry(1f, 0.05f), Entry(2f, 0.03f), Entry(3f, 0.08f), Entry(4f, 0.06f))
+            SENSOR_TEMPERATURA -> listOf(Entry(1f, 22f), Entry(2f, 25f), Entry(3f, 28f), Entry(4f, 27f))
+            SENSOR_PRESION -> listOf(Entry(1f, 990f), Entry(2f, 1005f), Entry(3f, 1015f), Entry(4f, 1000f))
+            SENSOR_METANO -> listOf(Entry(1f, 0.05f), Entry(2f, 0.03f), Entry(3f, 0.08f), Entry(4f, 0.06f))
             else -> emptyList()
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    /**
+     * Carga la configuración inicial de las gráficas desde el repositorio.
+     */
     fun loadInitialCharts(
         tempContainer: FrameLayout, tempBtn: ImageView,
         pressureContainer: FrameLayout, pressureBtn: ImageView,
         gasContainer: FrameLayout, gasBtn: ImageView
     ) {
         lifecycleScope.launch {
-            try {
-                val configs = graficasRepo.getGraficas()
-                if (configs.isEmpty()) {
-                    setupDefaultCharts(tempContainer, tempBtn, pressureContainer, pressureBtn, gasContainer, gasBtn)
-                    return@launch
-                }
-                configs.forEach { config ->
-                    when (config.sensor_id) {
-                        2 -> updateChart(tempContainer, config.tipo_grafica, "Temperatura", tempBtn, 2)
-                        3 -> updateChart(pressureContainer, config.tipo_grafica, "Presión", pressureBtn, 3)
-                        1 -> updateChart(gasContainer, config.tipo_grafica, "Metano", gasBtn, 1)
+            when (val result = graficasRepo.getGraficas()) {
+                is ResultWrapper.Success -> {
+                    val configs = result.data
+                    if (configs.isEmpty()) {
+                        setupDefaultCharts(tempContainer, tempBtn, pressureContainer, pressureBtn, gasContainer, gasBtn)
+                        return@launch
+                    }
+                    configs.forEach { config ->
+                        when (config.sensor_id) {
+                            SENSOR_TEMPERATURA -> updateChart(tempContainer, config.tipo_grafica, "Temperatura", tempBtn, SENSOR_TEMPERATURA)
+                            SENSOR_PRESION -> updateChart(pressureContainer, config.tipo_grafica, "Presión", pressureBtn, SENSOR_PRESION)
+                            SENSOR_METANO -> updateChart(gasContainer, config.tipo_grafica, "Metano", gasBtn, SENSOR_METANO)
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error al cargar configuración de gráficas: ${e.message}", Toast.LENGTH_LONG).show()
-                setupDefaultCharts(tempContainer, tempBtn, pressureContainer, pressureBtn, gasContainer, gasBtn)
+                is ResultWrapper.Error -> {
+                    Toast.makeText(context, "Error al cargar configuración: ${result.message}", Toast.LENGTH_LONG).show()
+                    setupDefaultCharts(tempContainer, tempBtn, pressureContainer, pressureBtn, gasContainer, gasBtn)
+                }
             }
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    /**
+     * Establece gráficas de línea por defecto si no hay configuración guardada.
+     */
     private fun setupDefaultCharts(
         tempContainer: FrameLayout, tempBtn: ImageView,
         pressureContainer: FrameLayout, pressureBtn: ImageView,
         gasContainer: FrameLayout, gasBtn: ImageView
     ) {
-        updateChart(tempContainer, "line", "Temperatura", tempBtn, 2)
-        updateChart(pressureContainer, "line", "Presión", pressureBtn, 3)
-        updateChart(gasContainer, "line", "Metano", gasBtn, 1)
+        updateChart(tempContainer, "line", "Temperatura", tempBtn, SENSOR_TEMPERATURA)
+        updateChart(pressureContainer, "line", "Presión", pressureBtn, SENSOR_PRESION)
+        updateChart(gasContainer, "line", "Metano", gasBtn, SENSOR_METANO)
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    /**
+     * Muestra el diálogo para seleccionar el tipo de gráfica y guarda el cambio.
+     */
     fun showGraphTypeDialog(label: String, container: FrameLayout, button: ImageView, sensorId: Int) {
         val graphTypes = arrayOf("Gráfica de Barra", "Gráfica de Línea", "Gráfica Circular")
         MaterialAlertDialogBuilder(context)
@@ -90,20 +97,26 @@ class AdminChartManager(
                     2 -> "pie"
                     else -> "line"
                 }
+
                 updateChart(container, type, label, button, sensorId)
+
                 lifecycleScope.launch {
-                    try {
-                        graficasRepo.updateGrafica(sensorId, type)
-                        Toast.makeText(context, "Gráfica de $label actualizada a ${type}", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+                    when (val result = graficasRepo.updateGrafica(sensorId, type)) {
+                        is ResultWrapper.Success -> {
+                            Toast.makeText(context, "Gráfica de $label actualizada a $type", Toast.LENGTH_SHORT).show()
+                        }
+                        is ResultWrapper.Error -> {
+                            Toast.makeText(context, "Error al guardar configuración: ${result.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
             .show()
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
+    /**
+     * Crea y dibuja la gráfica seleccionada en el contenedor FrameLayout.
+     */
     fun updateChart(container: FrameLayout, type: String, label: String, button: ImageView, sensorId: Int) {
         container.removeAllViews()
         val chart: Chart<*> = when (type) {
@@ -113,10 +126,8 @@ class AdminChartManager(
             else -> LineChart(context)
         }
 
-        // Dibuja la gráfica con datos falsos
-        setupChartData(chart, type, label, sensorId)
+        setupChartData(chart, label, sensorId)
 
-        // Configuración visual básica y añade el botón de cambio
         chart.layoutParams = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
@@ -125,13 +136,14 @@ class AdminChartManager(
         chart.legend.isEnabled = false
 
         container.addView(chart)
-        // El botón debe ir sobre la gráfica
         container.addView(button)
         button.bringToFront()
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun setupChartData(chart: Chart<*>, type: String, label: String, sensorId: Int) {
+    /**
+     * Configura los datos y el estilo para el tipo de gráfica dado.
+     */
+    private fun setupChartData(chart: Chart<*>, label: String, sensorId: Int) {
         val entries = getFakeEntries(sensorId)
         val color = getSensorColor(sensorId)
 
@@ -154,12 +166,11 @@ class AdminChartManager(
                 chart.data = BarData(dataSet)
             }
             is PieChart -> {
-                // Para PieChart, se usa la suma de los valores falsos
                 val totalValue = entries.sumOf { it.y.toDouble() }.toFloat()
                 val pieEntries = listOf(
-                    PieEntry(totalValue * 0.4f, "V1"),
-                    PieEntry(totalValue * 0.3f, "V2"),
-                    PieEntry(totalValue * 0.3f, "V3")
+                    PieEntry(totalValue * 0.4f, "Valor 1"),
+                    PieEntry(totalValue * 0.3f, "Valor 2"),
+                    PieEntry(totalValue * 0.3f, "Valor 3")
                 )
                 val dataSet = PieDataSet(pieEntries, label).apply {
                     colors = getPieChartColors(sensorId)
@@ -171,31 +182,49 @@ class AdminChartManager(
         chart.invalidate()
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    fun getSensorColor(sensorId: Int): Int = when (sensorId) {
-        2 -> context.resources.getColor(R.color.temp_color, null) // Temperatura
-        3 -> context.resources.getColor(R.color.pressure_color, null) // Presión
-        1 -> context.resources.getColor(R.color.gas_color, null) // Metano
-        else -> context.resources.getColor(R.color.teal_700, null)
-    }
+    /**
+     * Obtiene el color principal del sensor usando ContextCompat para mayor seguridad.
+     */
+    fun getSensorColor(sensorId: Int): Int = ContextCompat.getColor(
+        context, when (sensorId) {
+            SENSOR_TEMPERATURA -> R.color.temp_color
+            SENSOR_PRESION -> R.color.pressure_color
+            SENSOR_METANO -> R.color.gas_color
+            else -> R.color.teal_700
+        }
+    )
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun getPieChartColors(sensorId: Int): List<Int> = when(sensorId) {
-        2 -> listOf(
-            context.resources.getColor(R.color.temp_color_light, null),
-            context.resources.getColor(R.color.temp_color, null),
-            context.resources.getColor(R.color.temp_color_dark, null)
+    /**
+     * Obtiene la lista de colores para la gráfica circular (PieChart).
+     */
+    private fun getPieChartColors(sensorId: Int): List<Int> {
+        val lightColor: Int
+        val normalColor: Int
+        val darkColor: Int
+
+        when (sensorId) {
+            SENSOR_TEMPERATURA -> {
+                lightColor = R.color.temp_color_light
+                normalColor = R.color.temp_color
+                darkColor = R.color.temp_color_dark
+            }
+            SENSOR_PRESION -> {
+                lightColor = R.color.pressure_color_light
+                normalColor = R.color.pressure_color
+                darkColor = R.color.pressure_color_dark
+            }
+            SENSOR_METANO -> {
+                lightColor = R.color.gas_color_light
+                normalColor = R.color.gas_color
+                darkColor = R.color.gas_color_dark
+            }
+            else -> return listOf(ContextCompat.getColor(context, R.color.teal_200), ContextCompat.getColor(context, R.color.teal_700))
+        }
+
+        return listOf(
+            ContextCompat.getColor(context, lightColor),
+            ContextCompat.getColor(context, normalColor),
+            ContextCompat.getColor(context, darkColor)
         )
-        3 -> listOf(
-            context.resources.getColor(R.color.pressure_color_light, null),
-            context.resources.getColor(R.color.pressure_color, null),
-            context.resources.getColor(R.color.pressure_color_dark, null)
-        )
-        1 -> listOf(
-            context.resources.getColor(R.color.gas_color_light, null),
-            context.resources.getColor(R.color.gas_color, null),
-            context.resources.getColor(R.color.gas_color_dark, null)
-        )
-        else -> listOf(context.resources.getColor(R.color.teal_200, null), context.resources.getColor(R.color.teal_700, null))
     }
 }

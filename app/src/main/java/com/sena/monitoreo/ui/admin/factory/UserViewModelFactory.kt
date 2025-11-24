@@ -1,10 +1,9 @@
-// com.sena.monitoreo.ui.admin.viewmodel.UserViewModelFactory.kt
-
-package com.sena.monitoreo.ui.admin.viewmodel
+package com.sena.monitoreo.ui.admin.factory
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.sena.monitoreo.data.repository.UserRepository
+import com.sena.monitoreo.ui.admin.viewmodel.UserViewModel
 
 class UserViewModelFactory(private val repository: UserRepository) : ViewModelProvider.Factory {
 

@@ -1,21 +1,35 @@
 package com.sena.monitoreo.data.repository
 
-import com.sena.monitoreo.data.model.ai.VoiceResponse
 import com.sena.monitoreo.data.api.ApiVoice
+import com.sena.monitoreo.data.api.RetrofitClient
+import com.sena.monitoreo.data.model.voice.VoiceConfigResponse
+import com.sena.monitoreo.utils.ResultWrapper
+import com.sena.monitoreo.utils.safeApiCall
 
-class VoiceRepository(private val apiService: ApiVoice) {
+/**
+ * Repositorio para la gestión de la configuración de voz
+ */
+class VoiceRepository(
+    private val apiVoice: ApiVoice = RetrofitClient.apiVoice
+) {
 
-    suspend fun getVoiceConfig(): VoiceResponse {
-        return try {
-            apiService.fetchVoiceConfig()
-        } catch (e: Exception) {
-            // Valor por defecto en caso de error
-            VoiceResponse(gender = "FEMALE", pitch = 1.0f)
+    /**
+     * Obtiene la configuración de voz actual.
+     */
+    suspend fun getVoiceConfig(): ResultWrapper<VoiceConfigResponse> {
+        return safeApiCall {
+            apiVoice.getVoiceConfig()
         }
     }
 
-    suspend fun saveVoiceConfig(gender: String, pitch: Float) {
-        val config = VoiceResponse(gender = gender, pitch = pitch)
-        apiService.saveVoiceConfig(config)
+    /**
+     * Guarda o actualiza la configuración de voz.
+     *
+     * @param config El objeto que contiene el gender y el pitch.
+     */
+    suspend fun saveVoiceConfig(config: VoiceConfigResponse): ResultWrapper<VoiceConfigResponse> {
+        return safeApiCall {
+            apiVoice.saveVoiceConfig(config)
+        }
     }
 }

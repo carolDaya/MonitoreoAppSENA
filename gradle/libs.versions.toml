@@ -19,7 +19,12 @@ lifecycle = "2.8.1"
 waveformseekbar = "5.0.2"
 amplituda = "2.2.2"
 spinkit = "1.4.0"
+kotlinxCoroutines = "1.8.0"
 [libraries]
+# Define la librería Core
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+# Define la librería Android
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 # AndroidX
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }

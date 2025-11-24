@@ -1,6 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+
+    <string name="error_network">Error de red. Por favor, revisa tu conexión a internet.</string>
+    <string name="error_unexpected">Ocurrió un error inesperado. Intenta de nuevo.</string>
+
+    <string name="error_field_required_name">El nombre es obligatorio.</string>
+    <string name="error_field_required_phone">El teléfono es obligatorio.</string>
+    <string name="error_field_required_password">La contraseña es obligatoria.</string>
+    <string name="error_field_required_confirm">Debes confirmar la contraseña.</string>
+
+    <string name="msg_registration_success">Registro exitoso. ¡Bienvenido!</string>
+    <string name="msg_password_updated">Contraseña actualizada correctamente.</string>
+
+    <string name="hint_name">Nombre completo</string>
+    <string name="hint_phone">Teléfono (10 dígitos)</string>
+    <string name="hint_password">Contraseña</string>
+    <string name="hint_confirm_password">Confirmar contraseña</string>
+
+    <string name="btn_register">Registrarse</string>
+    <string name="btn_login">Iniciar Sesión</string>
+    <string name="text_login_link">¿Ya tienes cuenta? Inicia Sesión</string>
+    <string name="text_signup_link">¿No tienes cuenta? Regístrate</string>
+    <string name="text_forgot_password">¿Olvidaste tu contraseña?</string>
+
     <!-- ================= APP ================= -->
     <string name="app_name">SENA Monitoreo</string>
     <string name="app_title">BMIS</string>

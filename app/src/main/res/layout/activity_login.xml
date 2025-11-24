@@ -9,13 +9,11 @@
     android:background="@color/background_primary"
     tools:context=".ui.auth.LoginActivity">
 
-    <!-- ================== CONTENIDO PRINCIPAL ================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/main_content_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- Imagen de fondo decorativa -->
         <ImageView
             android:id="@+id/background_image"
             android:layout_width="0dp"
@@ -32,7 +30,6 @@
             app:srcCompat="@drawable/logo_gradient_circle"
             tools:ignore="ContentDescription" />
 
-        <!-- Logo principal -->
         <ImageView
             android:id="@+id/logo_bmis_image"
             android:layout_width="0dp"
@@ -48,7 +45,6 @@
             app:layout_constraintWidth_percent="0.8"
             app:srcCompat="@drawable/logo_image_bmis" />
 
-        <!-- Imagen decorativa avión -->
         <ImageView
             android:id="@+id/plane_image"
             android:layout_width="0dp"
@@ -65,7 +61,6 @@
             app:layout_constraintWidth_percent="0.6"
             app:srcCompat="@drawable/logo_plane" />
 
-        <!-- Título principal -->
         <TextView
             android:id="@+id/title_bmis_text"
             style="@style/TextAppearance.App.Title"
@@ -79,7 +74,6 @@
             app:layout_constraintTop_toBottomOf="@id/logo_bmis_image"
             tools:ignore="TextContrastCheck" />
 
-        <!-- Subtítulo -->
         <TextView
             android:id="@+id/subtitle_control_app"
             style="@style/TextAppearance.App.Subtitle"
@@ -92,7 +86,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/title_bmis_text" />
 
-        <!-- Campo de teléfono -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/input_layout_phone"
             style="@style/Widget.App.TextInputLayout.OutlinedBox"
@@ -121,7 +114,6 @@
                 tools:ignore="VisualLintTextFieldSize" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Campo de contraseña -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/input_layout_password"
             style="@style/Widget.App.TextInputLayout.OutlinedBox"
@@ -152,7 +144,6 @@
                 tools:ignore="VisualLintTextFieldSize" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Texto de error -->
         <TextView
             android:id="@+id/text_error_message"
             android:layout_width="0dp"
@@ -165,7 +156,6 @@
             app:layout_constraintStart_toStartOf="@id/input_layout_password"
             app:layout_constraintTop_toBottomOf="@id/input_layout_password" />
 
-        <!-- Enlace: Olvidé mi contraseña -->
         <TextView
             android:id="@+id/forgot_password_text"
             style="@style/TextAppearance.App.Link"
@@ -177,7 +167,6 @@
             app:layout_constraintEnd_toEndOf="@id/input_layout_password"
             app:layout_constraintTop_toBottomOf="@id/text_error_message" />
 
-        <!-- Enlace: Crear cuenta -->
         <TextView
             android:id="@+id/create_account_text"
             style="@style/TextAppearance.App.Link"
@@ -189,9 +178,9 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/forgot_password_text" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ================== BOTTOM SHEET ================== -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottom_sheet"
         android:layout_width="match_parent"
@@ -201,7 +190,6 @@
         app:layout_anchorGravity="bottom|center"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
-        <!-- Indicador superior del BottomSheet -->
         <ImageView
             android:id="@+id/bottom_sheet_handle"
             android:layout_width="70dp"
@@ -215,7 +203,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- Botón de acceso -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/login_button"
             style="@style/Widget.App.Button.Filled"
@@ -232,6 +219,14 @@
             app:layout_constraintTop_toBottomOf="@id/bottom_sheet_handle"
             app:layout_constraintWidth_percent="0.85"
             app:backgroundTint="@null" />
+
+
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <include
+        layout="@layout/include_network_error"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

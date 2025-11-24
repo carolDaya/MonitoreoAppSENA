@@ -1,19 +1,26 @@
 package com.sena.monitoreo.data.repository
 
+import com.sena.monitoreo.data.api.ApiSensor
 import com.sena.monitoreo.data.api.RetrofitClient
-import com.sena.monitoreo.data.model.sensor.LecturaResponse
 import com.sena.monitoreo.data.model.sensor.SensorResponse
+import com.sena.monitoreo.utils.ResultWrapper
+import com.sena.monitoreo.utils.safeApiCall
 
-class SensorRepository {
-    private val api = RetrofitClient.apiSensores
+/**
+ * Repositorio para la gestión de sensores.
+ */
+class SensorRepository(
+    private val apiSensor: ApiSensor = RetrofitClient.apiSensores
+) {
 
-    suspend fun getSensores(): List<SensorResponse> {
-        val response = api.getSensores()
-        return if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
+    /**
+     * Obtiene la lista completa de sensores.
+     * Retorna ResultWrapper<List<SensorResponse>>.
+     */
+    suspend fun getSensores(): ResultWrapper<List<SensorResponse>> {
+        return safeApiCall {
+            apiSensor.getSensores()
+        }
     }
 
-    suspend fun getLecturas(sensorId: Int): List<LecturaResponse> {
-        val response = api.getLecturas(sensorId)
-        return if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-    }
 }

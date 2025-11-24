@@ -1,21 +1,17 @@
 package com.sena.monitoreo.data.api
 
-import com.sena.monitoreo.data.model.ai.VoiceResponse
+import com.sena.monitoreo.data.model.voice.VoiceConfigResponse
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 
 interface ApiVoice {
 
-    /**
-     * Endpoint GET: Obtener la configuración actual.
-     */
     @GET("voice")
-    suspend fun fetchVoiceConfig(): VoiceResponse // Usa el data class
+    suspend fun getVoiceConfig(): Response<VoiceConfigResponse>
 
-    /**
-     * Endpoint POST: Guardar/Actualizar la configuración.
-     */
     @POST("voice")
-    suspend fun saveVoiceConfig(@Body config: VoiceResponse): VoiceResponse // Usa el data class
+    suspend fun saveVoiceConfig(@Body config: VoiceConfigResponse): Response<VoiceConfigResponse>
+
 }

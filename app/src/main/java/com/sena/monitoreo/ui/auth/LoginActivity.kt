@@ -4,24 +4,35 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.sena.monitoreo.R
+import com.sena.monitoreo.data.repository.AuthRepository
 import com.sena.monitoreo.databinding.ActivityLoginBinding
 import com.sena.monitoreo.ui.admin.HomeAdminActivity
 import com.sena.monitoreo.ui.user.HomeUserActivity
 import com.sena.monitoreo.utils.UiUtils
+import com.sena.monitoreo.utils.NetworkRetryListener
+import com.sena.monitoreo.ui.auth.viewmodel.login.LoginViewModel
+import com.sena.monitoreo.ui.auth.viewmodel.login.LoginUiState
+import com.sena.monitoreo.ui.auth.factory.AuthViewModelFactory
+import com.sena.monitoreo.ui.base.BaseActivity // Importar la clase base
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class LoginActivity : AppCompatActivity() {
+// 💡 1. Cambiar la herencia a BaseActivity e implementar NetworkRetryListener
+class LoginActivity : BaseActivity(), NetworkRetryListener {
 
     private lateinit var binding: ActivityLoginBinding
-    private val viewModel: LoginViewModel by viewModels()
+
+    private val viewModel: LoginViewModel by lazy {
+        val factory = AuthViewModelFactory(AuthRepository())
+        ViewModelProvider(this, factory)[LoginViewModel::class.java]
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,10 +40,23 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 💡 CLAVE 1: Inicializar el manejo de errores de red (Método heredado de BaseActivity)
+        // 'binding.containerLogin' es el ViewGroup raíz donde se incluyó la vista de error.
+        setupNetworkErrorHandling(binding.containerLogin as ViewGroup, this)
+
         setupWindowInsets()
         setupInputWatcher()
         setupListeners()
         observeUiState()
+    }
+
+    override fun onNetworkRetry() {
+        val phone = binding.inputPhone.text.toString().trim()
+        val password = binding.inputPassword.text.toString().trim()
+
+        if (phone.isNotEmpty() && password.isNotEmpty()) {
+            viewModel.login(phone, password)
+        }
     }
 
     private fun setupWindowInsets() {
@@ -83,17 +107,26 @@ class LoginActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         binding.loginButton.setOnClickListener {
+            hideNetworkError() // Aseguramos que la vista de error se oculte antes del intento
             val phone = binding.inputPhone.text.toString().trim()
             val password = binding.inputPassword.text.toString().trim()
             viewModel.login(phone, password)
         }
 
         binding.createAccountText.setOnClickListener {
-            UiUtils.navigateTo(this, SignupActivity::class.java)
+            UiUtils.navigateTo(
+                this@LoginActivity,
+                SignupActivity::class.java,
+                finishCurrent = false
+            )
         }
 
         binding.forgotPasswordText.setOnClickListener {
-            UiUtils.navigateTo(this, ForgotPasswordActivity::class.java)
+            UiUtils.navigateTo(
+                this@LoginActivity,
+                ForgotPasswordActivity::class.java,
+                finishCurrent = false
+            )
         }
     }
 
@@ -104,6 +137,7 @@ class LoginActivity : AppCompatActivity() {
                     is LoginUiState.Loading -> UiUtils.showLoading(this@LoginActivity, "Iniciando sesión...")
                     is LoginUiState.Success -> {
                         UiUtils.hideLoading()
+                        hideNetworkError() // Asegurarse de ocultar si se reconectó exitosamente
                         UiUtils.showSnackbar(binding.root, "Bienvenido ${state.role}!")
 
                         when (state.role.lowercase()) {
@@ -121,7 +155,15 @@ class LoginActivity : AppCompatActivity() {
                     }
                     is LoginUiState.Error -> {
                         UiUtils.hideLoading()
-                        UiUtils.showSnackbar(binding.root, state.message, isError = true)
+
+                        // 💡 CLAVE 3: Manejo de error de red
+                        // Si el mensaje contiene "Error de red" o "IOException", mostramos la pantalla de error.
+                        if (state.message.contains("Error de red", ignoreCase = true) || state.message.contains("IOException", ignoreCase = true)) {
+                            showNetworkError(state.message) // Método heredado
+                        } else {
+                            // Para otros errores (credenciales, servidor, etc.), usamos el Snackbar
+                            UiUtils.showSnackbar(binding.root, state.message, isError = true)
+                        }
                     }
                     LoginUiState.Idle -> Unit
                 }

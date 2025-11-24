@@ -10,69 +10,89 @@
     android:fitsSystemWindows="true"
     tools:context=".ui.user.SensorDataActivity">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/main"
+    <!-- 💡 CONTENEDOR PRINCIPAL MEJORADO -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/gray_300"
-        tools:context=".ui.admin.AdministradorActivity">
+        android:layout_height="match_parent">
 
-        <include
-            android:id="@+id/header_user"
-            layout="@layout/header_layout_user"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+        <!-- CONTENIDO NORMAL - ESTE SE OCULTA CUANDO HAY ERROR -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/main_content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/gray_300"
+            tools:context=".ui.admin.AdministradorActivity">
 
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/main_scroll"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_marginTop="@dimen/spacing_small"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/header_user">
-
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:layout_width="match_parent"
+            <include
+                android:id="@+id/header_user"
+                layout="@layout/header_layout_user"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:padding="@dimen/spacing_large">
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
-                <include
-                    android:id="@+id/card_mq4"
-                    layout="@layout/include_card_sensor_user"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/spacing_large"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-                <include
-                    android:id="@+id/card_temperatura"
-                    layout="@layout/include_card_sensor_user"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/spacing_large"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/card_mq4" />
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/main_scroll"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_marginTop="@dimen/spacing_small"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/header_user">
 
-                <include
-                    android:id="@+id/card_presion"
-                    layout="@layout/include_card_sensor_user"
-                    android:layout_width="0dp"
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/spacing_large"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/card_temperatura" />
+                    android:padding="@dimen/spacing_large">
 
-            </androidx.constraintlayout.widget.ConstraintLayout>
-        </androidx.core.widget.NestedScrollView>
-    </androidx.constraintlayout.widget.ConstraintLayout>
+                    <include
+                        android:id="@+id/card_mq4"
+                        layout="@layout/include_card_sensor_user"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_large"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <include
+                        android:id="@+id/card_temperatura"
+                        layout="@layout/include_card_sensor_user"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_large"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/card_mq4" />
+
+                    <include
+                        android:id="@+id/card_presion"
+                        layout="@layout/include_card_sensor_user"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_large"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/card_temperatura" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </androidx.core.widget.NestedScrollView>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- 💡 LAYOUT DE ERROR - ESTE SE MUESTRA SOLO CUANDO HAY ERROR -->
+        <include
+            layout="@layout/include_network_error"
+            android:id="@+id/network_error_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- NAVEGACIÓN LATERAL -->
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
         android:layout_width="wrap_content"
@@ -84,4 +104,5 @@
         app:itemTextColor="@color/white"
         app:itemBackground="@drawable/nav_item_background"
         app:menu="@menu/nav_user_menu" />
+
 </androidx.drawerlayout.widget.DrawerLayout>

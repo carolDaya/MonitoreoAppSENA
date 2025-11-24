@@ -4,24 +4,35 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.sena.monitoreo.data.api.RetrofitClient
+import com.sena.monitoreo.data.repository.AuthRepository
 import com.sena.monitoreo.databinding.ActivityForgotPasswordBinding
-import com.sena.monitoreo.ui.auth.ResetPasswordActivity
+import com.sena.monitoreo.ui.auth.factory.AuthViewModelFactory
+import com.sena.monitoreo.ui.auth.viewmodel.password_reset.ForgotPasswordViewModel
+import com.sena.monitoreo.ui.auth.viewmodel.password_reset.ForgotPasswordUiState
+import com.sena.monitoreo.ui.base.BaseActivity // 💡 Importado
+import com.sena.monitoreo.utils.NetworkRetryListener // 💡 Importado
 import com.sena.monitoreo.utils.UiUtils
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
+import java.io.IOException
 
-class ForgotPasswordActivity : AppCompatActivity() {
+// 💡 1. Heredar de BaseActivity e implementar NetworkRetryListener
+class ForgotPasswordActivity : BaseActivity(), NetworkRetryListener {
 
     private lateinit var binding: ActivityForgotPasswordBinding
-    private val TAG = "ForgotPasswordActivity"
+
+    // Inicialización del ViewModel usando el Factory
+    private val viewModel: ForgotPasswordViewModel by lazy {
+        val factory = AuthViewModelFactory(AuthRepository())
+        ViewModelProvider(this, factory)[ForgotPasswordViewModel::class.java]
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,60 +40,114 @@ class ForgotPasswordActivity : AppCompatActivity() {
         binding = ActivityForgotPasswordBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Ajustar padding automático por barras del sistema
+        setupWindowInsets()
+
+        // 💡 2. Inicializar el manejo de errores de red (Método heredado)
+        setupNetworkErrorHandling(binding.containerForgot as ViewGroup, this)
+
+        setupListeners()
+        observeUiState()
+
+        // Ocultar botón inicialmente
+        binding.buttonResetPassword.visibility = View.GONE
+    }
+
+    // 💡 3. Implementación obligatoria del método de reintento
+    override fun onNetworkRetry() {
+        // En esta pantalla, el reintento significa intentar de nuevo la verificación del teléfono
+        val phone = binding.editTextPhone.text?.toString()?.trim().orEmpty()
+        if (phone.isNotEmpty()) {
+            viewModel.verifyPhoneNumber(phone)
+        } else {
+            hideNetworkError()
+            // Podrías forzar el reintento a fallar si el campo está vacío, pero es mejor notificar.
+            UiUtils.showSnackbar(binding.containerForgot, "Por favor, ingrese un número de teléfono para reintentar.", isError = true)
+        }
+    }
+
+    private fun setupWindowInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.containerForgot) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+    }
 
-        // Botón de cierre
+    private fun setupListeners() {
+        // Botón de cerrar (volver al Login)
         binding.closeButton.setOnClickListener { finish() }
 
-        // Ocultar botón inicialmente
-        binding.buttonResetPassword.visibility = View.GONE
-
-        // Detectar texto en input
         binding.editTextPhone.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun afterTextChanged(s: Editable?) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                // Limpiar error tan pronto como el usuario empiece a escribir
+                // Limpiar errores (incluyendo error de TextInputLayout) y ocultar la pantalla de red
                 binding.textInputLayoutPhone.error = null
+                hideNetworkError()
                 toggleResetButton()
             }
         })
 
-        // Acción al presionar "Restablecer contraseña"
         binding.buttonResetPassword.setOnClickListener {
+            // Aseguramos que la vista de error se oculte antes del intento
+            hideNetworkError()
             val phone = binding.editTextPhone.text?.toString()?.trim().orEmpty()
-
-            // Usar la nueva función de validación antes de llamar a la API
-            if (isInputValid(phone)) {
-                verificarTelefono(phone)
-            }
+            viewModel.verifyPhoneNumber(phone)
         }
     }
 
-    /**
-     * Valida el formato y presencia del número de teléfono.
-     * Muestra el error debajo del input (TextInputLayout.error).
-     */
-    private fun isInputValid(phone: String): Boolean {
-        binding.textInputLayoutPhone.error = null // Reiniciar error
+    private fun observeUiState() {
+        lifecycleScope.launch {
+            viewModel.uiState.collectLatest { state ->
+                when (state) {
+                    ForgotPasswordUiState.Idle -> {
+                        UiUtils.hideLoading()
+                        hideNetworkError()
+                    }
+                    ForgotPasswordUiState.Loading -> {
+                        // Limpiar errores mientras carga para mejor UX
+                        binding.textInputLayoutPhone.error = null
+                        UiUtils.showLoading(this@ForgotPasswordActivity, "Verificando teléfono...")
+                    }
+                    is ForgotPasswordUiState.Success -> {
+                        UiUtils.hideLoading()
+                        hideNetworkError() // Ocultar si la conexión fue exitosa
+                        UiUtils.showSnackbar(binding.containerForgot, "Teléfono verificado correctamente", isError = false)
 
-        if (phone.isBlank()) {
-            binding.textInputLayoutPhone.error = "Ingrese su número de teléfono"
-            return false
+                        // Navegación al siguiente paso
+                        val intent = Intent(this@ForgotPasswordActivity, ResetPasswordActivity::class.java)
+                        intent.putExtra("PHONE_NUMBER", state.phone)
+                        startActivity(intent)
+                    }
+                    is ForgotPasswordUiState.Error -> {
+                        UiUtils.hideLoading()
+
+                        val errorMessage = state.message
+
+                        // 💡 CLAVE 4: Manejo de error de red y errores de negocio
+
+                        if (errorMessage.contains("Error de red", ignoreCase = true) || errorMessage.contains("IOException", ignoreCase = true)) {
+                            // 1. Error de red: Muestra la pantalla de error de red (Método heredado)
+                            showNetworkError(errorMessage)
+                        } else {
+                            // Identificar errores de validación local (formato/vacío)
+                            val isLocalValidationError = errorMessage.contains("formato", ignoreCase = true) ||
+                                    errorMessage.contains("vacío", ignoreCase = true)
+
+                            if (isLocalValidationError) {
+                                // 2. Error de validación local: Mostrar en el TextInputLayout
+                                binding.textInputLayoutPhone.error = errorMessage
+                            } else {
+                                // 3. Errores de negocio/servidor (ej. "Usuario no existe"): Mostrar en Snackbar
+                                binding.textInputLayoutPhone.error = null // Asegurar que el input esté limpio
+                                UiUtils.showSnackbar(binding.containerForgot, errorMessage, isError = true)
+                            }
+                        }
+                    }
+                    else -> Unit // Asegurarse de manejar cualquier estado futuro si se añade
+                }
+            }
         }
-
-        // Agregar validación de 10 dígitos (asumiendo el requisito de 10)
-        if (!phone.matches(Regex("^\\d{10}$"))) {
-            binding.textInputLayoutPhone.error = "El número debe tener exactamente 10 dígitos"
-            return false
-        }
-
-        return true
     }
 
     /**
@@ -107,42 +172,6 @@ class ForgotPasswordActivity : AppCompatActivity() {
                     .setDuration(200)
                     .withEndAction { binding.buttonResetPassword.visibility = View.GONE }
                     .start()
-            }
-        }
-    }
-
-    /**
-     * Verifica si el teléfono existe en el servidor.
-     * Los errores de servidor o conexión se muestran con Snackbar (práctica correcta).
-     */
-    private fun verificarTelefono(phone: String) {
-        UiUtils.showLoading(this, "Verificando teléfono...")
-
-        lifecycleScope.launch {
-            try {
-                val response = RetrofitClient.apiAuth.resetPasswordRequest(mapOf("telefono" to phone))
-                UiUtils.hideLoading()
-
-                if (response.isSuccessful) {
-                    UiUtils.showSnackbar(binding.containerForgot, "Teléfono verificado correctamente")
-                    val intent = Intent(this@ForgotPasswordActivity, ResetPasswordActivity::class.java)
-                    intent.putExtra("PHONE_NUMBER", phone)
-                    startActivity(intent)
-                } else {
-                    // El error de "No existe usuario" es una respuesta del servidor,
-                    // por lo tanto, se usa Snackbar para avisar globalmente.
-                    val errorBody = response.errorBody()?.string()
-                    Log.e(TAG, "Error del servidor: $errorBody")
-                    UiUtils.showSnackbar(binding.containerForgot, "No existe un usuario con ese teléfono", isError = true)
-                }
-            } catch (e: HttpException) {
-                UiUtils.hideLoading()
-                Log.e(TAG, "Error HTTP: ${e.message()}")
-                UiUtils.showSnackbar(binding.containerForgot, "Error de conexión con el servidor", isError = true)
-            } catch (e: Exception) {
-                UiUtils.hideLoading()
-                Log.e(TAG, "Error inesperado", e)
-                UiUtils.showSnackbar(binding.containerForgot, "Error inesperado al verificar", isError = true)
             }
         }
     }

@@ -3,106 +3,146 @@ package com.sena.monitoreo.ui.admin.viewmodel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.sena.monitoreo.data.repository.ProcesoRepository
+import com.sena.monitoreo.utils.ResultWrapper
 import kotlinx.coroutines.launch
+import android.util.Log
+import java.io.IOException
 
-class ProcesoViewModel(val repository: ProcesoRepository) : ViewModel() {
+class ProcesoViewModel(private val repository: ProcesoRepository) : ViewModel() {
 
-    // LiveData para el mensaje de estado (éxito o error)
+    // 💡 CORRECCIÓN CRÍTICA: Inicializar como NULL para saber si ya se cargó
+    private val _isProcesoActivo = MutableLiveData<Boolean?>(null)
+    val isProcesoActivo: LiveData<Boolean?> = _isProcesoActivo
+
     private val _procesoStatus = MutableLiveData<String>()
     val procesoStatus: LiveData<String> = _procesoStatus
 
-    // LiveData para manejar el estado de carga
     private val _isLoading = MutableLiveData<Boolean>(false)
     val isLoading: LiveData<Boolean> = _isLoading
 
-    // LiveData para saber si hay proceso activo
-    private val _isProcesoActivo = MutableLiveData<Boolean>(false)
-    val isProcesoActivo: LiveData<Boolean> = _isProcesoActivo
-
-    // Función para iniciar el proceso
+    /**
+     * Inicia el proceso de monitoreo.
+     */
     fun iniciarProceso() {
         _isLoading.value = true
         viewModelScope.launch {
             try {
-                val response = repository.iniciarProceso()
-                if (response.isSuccessful) {
-                    val mensajeBackend = response.body()?.mensaje
-                    val mensajeFinal = if (mensajeBackend.isNullOrEmpty()) {
-                        "Proceso iniciado correctamente"
-                    } else {
-                        mensajeBackend
+                when (val result = repository.iniciarProceso()) {
+                    is ResultWrapper.Success -> {
+                        val mensajeFinal = result.data.mensaje ?: "Proceso iniciado correctamente"
+                        _procesoStatus.postValue(mensajeFinal)
+                        _isProcesoActivo.postValue(true) // 💡 Siempre true al iniciar
+                        Log.d("ProcesoVM", "✅ Proceso INICIADO - Estado: true")
                     }
-                    _procesoStatus.postValue(mensajeFinal)
-                    _isProcesoActivo.postValue(true)
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    val mensajeError = if (errorBody.isNullOrEmpty()) {
-                        "Error ${response.code()}: No se pudo iniciar el proceso"
-                    } else {
-                        errorBody
+                    is ResultWrapper.Error -> {
+                        val mensajeError = result.message ?: "Error desconocido al iniciar el proceso"
+                        _procesoStatus.postValue(mensajeError)
+                        // 💡 NO cambiar _isProcesoActivo en error - mantener estado actual
+                        Log.e("ProcesoVM", "❌ Error iniciando: $mensajeError")
                     }
-                    _procesoStatus.postValue(mensajeError)
                 }
+            } catch (e: IOException) {
+                val errorMsg = "Error de red: No se pudo conectar al servidor."
+                _procesoStatus.postValue(errorMsg)
+                Log.e("ProcesoVM", "🌐 Error red iniciando: ${e.message}")
             } catch (e: Exception) {
-                _procesoStatus.postValue("Error de conexión: ${e.message}")
+                val errorMsg = "Error inesperado: ${e.message}"
+                _procesoStatus.postValue(errorMsg)
+                Log.e("ProcesoVM", "💥 Error inesperado iniciando: ${e.message}")
             } finally {
                 _isLoading.postValue(false)
             }
         }
     }
 
-    // Función para finalizar el proceso
+    /**
+     * Finaliza el proceso de monitoreo.
+     */
     fun finalizarProceso() {
         _isLoading.value = true
         viewModelScope.launch {
             try {
-                val response = repository.finalizarProceso()
-                if (response.isSuccessful) {
-                    val mensajeBackend = response.body()?.mensaje
-                    val mensajeFinal = if (mensajeBackend.isNullOrEmpty()) {
-                        "Proceso finalizado correctamente"
-                    } else {
-                        mensajeBackend
+                when (val result = repository.finalizarProceso()) {
+                    is ResultWrapper.Success -> {
+                        val mensajeFinal = result.data.mensaje ?: "Proceso finalizado correctamente"
+                        _procesoStatus.postValue(mensajeFinal)
+                        _isProcesoActivo.postValue(false) // 💡 Siempre false al finalizar
+                        Log.d("ProcesoVM", "✅ Proceso FINALIZADO - Estado: false")
                     }
-                    _procesoStatus.postValue(mensajeFinal)
-                    _isProcesoActivo.postValue(false)
-                } else {
-                    val errorBody = response.errorBody()?.string()
-                    val mensajeError = if (errorBody.isNullOrEmpty()) {
-                        "Error ${response.code()}: No se pudo finalizar el proceso"
-                    } else {
-                        errorBody
+                    is ResultWrapper.Error -> {
+                        val mensajeError = result.message ?: "Error desconocido al finalizar el proceso"
+                        _procesoStatus.postValue(mensajeError)
+                        // 💡 NO cambiar _isProcesoActivo en error - mantener estado actual
+                        Log.e("ProcesoVM", "❌ Error finalizando: $mensajeError")
                     }
-                    _procesoStatus.postValue(mensajeError)
                 }
+            } catch (e: IOException) {
+                val errorMsg = "Error de red: No se pudo conectar al servidor."
+                _procesoStatus.postValue(errorMsg)
+                Log.e("ProcesoVM", "🌐 Error red finalizando: ${e.message}")
             } catch (e: Exception) {
-                _procesoStatus.postValue("Error de conexión: ${e.message}")
+                val errorMsg = "Error inesperado: ${e.message}"
+                _procesoStatus.postValue(errorMsg)
+                Log.e("ProcesoVM", "💥 Error inesperado finalizando: ${e.message}")
             } finally {
                 _isLoading.postValue(false)
             }
         }
     }
 
-    // Verificar estado del proceso
-    fun verificarEstadoProceso() {
+    /**
+     * 💡 CORRECCIÓN CRÍTICA: Método optimizado para cargar el estado
+     */
+    fun loadProcesoStatus() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val response = repository.verificarEstado()
-                if (response.isSuccessful && response.body() != null) {
-                    val responseBody = response.body()!!
-                    _isProcesoActivo.value = responseBody.proceso_activo
-                } else {
-                    _isProcesoActivo.value = false
+                when (val result = repository.verificarEstado()) {
+                    is ResultWrapper.Success -> {
+                        val nuevoEstado = result.data.proceso_activo
+                        val estadoAnterior = _isProcesoActivo.value
+
+                        // 💡 SOLO actualizar si el estado realmente cambió
+                        if (estadoAnterior != nuevoEstado) {
+                            _isProcesoActivo.value = nuevoEstado
+                            Log.d("ProcesoVM", "🔄 Estado ACTUALIZADO: $estadoAnterior -> $nuevoEstado")
+                        } else {
+                            Log.d("ProcesoVM", "⚡ Estado MANTENIDO: $nuevoEstado (sin cambios)")
+                        }
+
+                        _procesoStatus.value = if (nuevoEstado) "Proceso activo" else "Proceso inactivo"
+                    }
+                    is ResultWrapper.Error -> {
+                        val mensajeError = result.message ?: "Error al verificar estado"
+                        _procesoStatus.value = mensajeError
+                        // 💡 NO cambiar _isProcesoActivo en error - mantener último estado conocido
+                        Log.e("ProcesoVM", "❌ Error cargando estado: $mensajeError")
+                        Log.d("ProcesoVM", "📊 Manteniendo estado actual: ${_isProcesoActivo.value}")
+                    }
                 }
+            } catch (e: IOException) {
+                val errorMsg = "Error de red al verificar estado"
+                _procesoStatus.value = errorMsg
+                Log.e("ProcesoVM", "🌐 Error red cargando estado: ${e.message}")
+                Log.d("ProcesoVM", "📊 Manteniendo estado actual: ${_isProcesoActivo.value}")
             } catch (e: Exception) {
-                _isProcesoActivo.value = false
+                val errorMsg = "Error inesperado: ${e.message}"
+                _procesoStatus.value = errorMsg
+                Log.e("ProcesoVM", "💥 Error inesperado cargando estado: ${e.message}")
+                Log.d("ProcesoVM", "📊 Manteniendo estado actual: ${_isProcesoActivo.value}")
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    /**
+     * 💡 NUEVO: Método para forzar un estado específico (útil para testing)
+     */
+    fun setProcesoEstadoForzado(activo: Boolean) {
+        Log.d("ProcesoVM", "🔧 Estado FORZADO: $activo")
+        _isProcesoActivo.value = activo
     }
 }

@@ -11,21 +11,28 @@ class VoiceManager(
     private val onInitComplete: (() -> Unit)? = null
 ) : TextToSpeech.OnInitListener {
 
+    companion object {
+        private const val TAG = "VoiceManager"
+        private const val UTTERANCE_ID_PREFIX = "TTS_ID_"
+        private const val CHUNK_ID_PREFIX = "TTS_CHUNK_"
+        private const val SENTENCE_ID_PREFIX = "SENTENCE_"
+    }
+
     private var tts: TextToSpeech? = null
     var isReady = false
         private set
-    var isSpeaking = false
+
+    var isSpeaking: Boolean = false
         private set
 
     // Configuración
     var currentPitch: Float = 1.0f
     var currentGender: String = "FEMALE"
+    var currentRate: Float = 1.0f
 
-    // Voces preferidas
     private val preferredMaleVoices = listOf("male", "hombre", "masculino", "man", "mfb")
     private val preferredFemaleVoices = listOf("female", "mujer", "femenino", "woman", "efb")
 
-    // Callback para cuando termine la reproducción
     private var onUtteranceCompleted: (() -> Unit)? = null
 
     fun initialize() {
@@ -37,9 +44,9 @@ class VoiceManager(
             isReady = true
             applyTtsSettings()
             onInitComplete?.invoke()
-            Log.d("VoiceManager", "TTS inicializado correctamente")
+            Log.d(TAG, "TTS inicializado correctamente")
         } else {
-            Log.e("VoiceManager", "Error al inicializar TTS: $status")
+            Log.e(TAG, "Error al inicializar TTS: $status")
         }
     }
 
@@ -53,7 +60,7 @@ class VoiceManager(
         val locale = Locale("es", "ES")
         val result = tts?.setLanguage(locale)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.e("VoiceManager", "Idioma TTS no compatible")
+            Log.e(TAG, "Idioma TTS no compatible")
             return
         }
 
@@ -65,152 +72,110 @@ class VoiceManager(
         }
 
         tts?.setPitch(mapPitchValue(currentPitch))
+        tts?.setSpeechRate(mapSpeechRateValue(currentRate))
+
+        setupProgressListener()
+    }
+
+    private fun setupProgressListener() {
+        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {isSpeaking = true }
+            override fun onDone(utteranceId: String?) {
+                isSpeaking = false
+                if (utteranceId != null && utteranceId.startsWith(CHUNK_ID_PREFIX)) { }
+                onUtteranceCompleted?.invoke()
+            }
+
+            override fun onError(utteranceId: String?) {
+                isSpeaking = false
+                Log.e(TAG, "Error in: $utteranceId")
+                onUtteranceCompleted?.invoke()
+            }
+
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                isSpeaking = false
+            }
+        })
     }
 
     private fun setupMaleVoice(locale: Locale) {
         tts?.voices?.find {
-            it.locale.language == "es" &&
+            it.locale.language == locale.language &&
                     preferredMaleVoices.any { pref -> it.name.contains(pref, true) }
         }?.let {
             tts?.voice = it
-            return
         }
-        tts?.setPitch(0.8f)
-        tts?.setSpeechRate(0.9f)
     }
 
     private fun setupFemaleVoice(locale: Locale) {
         tts?.voices?.find {
-            it.locale.language == "es" &&
+            it.locale.language == locale.language &&
                     preferredFemaleVoices.any { pref -> it.name.contains(pref, true) }
         }?.let {
             tts?.voice = it
-            return
         }
-        tts?.setPitch(1.1f)
-        tts?.setSpeechRate(1.0f)
     }
 
     private fun setupRoboticVoice() {
         val locale = Locale("es", "ES")
-        tts?.voices?.find { it.locale.language == "es" }?.let { tts?.voice = it }
+        tts?.voices?.find { it.locale.language == locale.language }?.let { tts?.voice = it }
         tts?.setPitch(0.3f)
         tts?.setSpeechRate(0.75f)
     }
 
-    private fun mapPitchValue(value: Float): Float = when (value) {
-        0.8f -> 0.6f
-        1.0f -> 1.0f
-        1.3f -> 1.6f
-        else -> value.coerceIn(0.5f, 2.0f)
-    }
+    private fun mapPitchValue(value: Float): Float = value.coerceIn(0.5f, 2.0f)
+
+    private fun mapSpeechRateValue(value: Float): Float = value.coerceIn(0.1f, 2.0f)
+
 
     fun speak(text: String) {
         if (!isReady) {
-            Log.w("VoiceManager", "TTS no está listo")
+            Log.w(TAG, "TTS no está listo")
             return
         }
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "TTS_ID")
-        isSpeaking = true
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "$UTTERANCE_ID_PREFIX${System.currentTimeMillis()}")
     }
 
     fun speakLongText(fullText: String, chunkSize: Int = 200) {
         if (!isReady) {
-            Log.w("VoiceManager", "TTS no está listo")
+            Log.w(TAG, "TTS no está listo")
             return
         }
 
-        // Dividir el texto en chunks
         val chunks = fullText.chunked(chunkSize)
 
-        // Hablar el primer chunk
-        tts?.speak(chunks[0], TextToSpeech.QUEUE_FLUSH, null, "TTS_CHUNK_0")
+        tts?.speak(chunks[0], TextToSpeech.QUEUE_FLUSH, null, "${CHUNK_ID_PREFIX}0")
 
-        // Encolar los chunks restantes
         for (i in 1 until chunks.size) {
-            tts?.speak(chunks[i], TextToSpeech.QUEUE_ADD, null, "TTS_CHUNK_$i")
+            tts?.speak(chunks[i], TextToSpeech.QUEUE_ADD, null, "$CHUNK_ID_PREFIX$i")
         }
-
-        isSpeaking = true
     }
 
     fun speakLongTextWithCallback(fullText: String, chunkSize: Int = 200) {
-        if (!isReady) {
-            Log.w("VoiceManager", "TTS no está listo")
-            return
-        }
-
-        // Configurar listener de finalización
-        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {
-                Log.d("VoiceManager", "Started: $utteranceId")
-            }
-
-            override fun onDone(utteranceId: String?) {
-                Log.d("VoiceManager", "Completed: $utteranceId")
-                // Verificar si es el último chunk
-                if (utteranceId?.startsWith("TTS_CHUNK_") == true) {
-                    val chunkIndex = utteranceId.removePrefix("TTS_CHUNK_").toIntOrNull()
-                    val totalChunks = fullText.chunked(chunkSize).size
-                    if (chunkIndex == totalChunks - 1) {
-                        // Es el último chunk
-                        Log.d("VoiceManager", "Último chunk completado, llamando callback")
-                        onUtteranceCompleted?.invoke()
-                    }
-                } else if (utteranceId == "TTS_ID") {
-                    // Para speak normal
-                    onUtteranceCompleted?.invoke()
-                }
-            }
-
-            override fun onError(utteranceId: String?) {
-                Log.e("VoiceManager", "Error in: $utteranceId")
-                onUtteranceCompleted?.invoke() // Llamar callback incluso en error
-            }
-        })
-
-        // Dividir el texto en chunks
-        val chunks = fullText.chunked(chunkSize)
-
-        // Hablar el primer chunk
-        tts?.speak(chunks[0], TextToSpeech.QUEUE_FLUSH, null, "TTS_CHUNK_0")
-
-        // Encolar los chunks restantes
-        for (i in 1 until chunks.size) {
-            tts?.speak(chunks[i], TextToSpeech.QUEUE_ADD, null, "TTS_CHUNK_$i")
-        }
-
-        isSpeaking = true
+        speakLongText(fullText, chunkSize)
     }
 
     fun speakWithPauses(text: String, pauseBetweenSentences: Long = 500) {
         if (!isReady) return
 
-        // Dividir por oraciones
-        val sentences = text.split(". ", "! ", "? ").map { it.trim() }
+        val sentences = text.split(Regex("[.!?]\\s")).map { it.trim() }.filter { it.isNotEmpty() }
 
         sentences.forEachIndexed { index, sentence ->
-            val utteranceId = "SENTENCE_$index"
+            val utteranceId = "$SENTENCE_ID_PREFIX$index"
             if (index == 0) {
                 tts?.speak(sentence, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             } else {
-                // Agregar pausa pequeña entre oraciones
                 tts?.playSilentUtterance(pauseBetweenSentences, TextToSpeech.QUEUE_ADD, null)
                 tts?.speak(sentence, TextToSpeech.QUEUE_ADD, null, utteranceId)
             }
         }
-
-        isSpeaking = true
     }
 
-    fun isCurrentlySpeaking(): Boolean {
-        return tts?.isSpeaking == true
-    }
+    fun isCurrentlySpeaking(): Boolean { return isSpeaking }
 
     fun stop() {
         tts?.stop()
         isSpeaking = false
-        onUtteranceCompleted = null // Limpiar callback
     }
 
     fun release() {

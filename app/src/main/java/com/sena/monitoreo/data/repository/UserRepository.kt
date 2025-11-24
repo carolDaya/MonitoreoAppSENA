@@ -1,45 +1,44 @@
 package com.sena.monitoreo.data.repository
 
+import com.sena.monitoreo.data.api.ApiUser
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.model.user.UpdateEstadoRequest
 import com.sena.monitoreo.data.model.user.UserResponse
-import retrofit2.Response
+import com.sena.monitoreo.utils.ResultWrapper
+import com.sena.monitoreo.utils.safeApiCall
 
-class UserRepository {
+/**
+ * Repositorio para la gestión de usuarios
+ */
+class UserRepository(
+    private val apiUser: ApiUser = RetrofitClient.apiUser
+) {
 
-    suspend fun getAllUsers(): List<UserResponse>? {
-        val response = RetrofitClient.apiUser.getAllUsers()
-        return if (response.isSuccessful) {
-            response.body()
-        } else {
-            null
+    suspend fun getAllUsers(): ResultWrapper<List<UserResponse>> {
+        return safeApiCall {
+            apiUser.getAllUsers()
         }
     }
 
-    suspend fun getActiveUsers(): List<UserResponse>? {
-        val response = RetrofitClient.apiUser.getActiveUsers()
-        return if (response.isSuccessful) {
-            response.body()
-        } else {
-            null
+    suspend fun getActiveUsers(): ResultWrapper<List<UserResponse>> {
+        return safeApiCall {
+            apiUser.getActiveUsers()
         }
     }
 
-    suspend fun getBlockedUsers(): List<UserResponse>? {
-        val response = RetrofitClient.apiUser.getBlockedUsers()
-        return if (response.isSuccessful) {
-            response.body()
-        } else {
-            null
+    suspend fun getBlockedUsers(): ResultWrapper<List<UserResponse>> {
+        return safeApiCall {
+            apiUser.getBlockedUsers()
         }
     }
 
-    suspend fun updateEstado(userId: Int, nuevoEstado: String): Boolean {
-        return try {
-            val response = RetrofitClient.apiUser.updateEstado(userId, UpdateEstadoRequest(nuevoEstado))
-            response.isSuccessful
-        } catch (e: Exception) {
-            false
+    /**
+     * Actualiza el estado de un usuario.
+     */
+    suspend fun updateEstado(userId: Int, nuevoEstado: String): ResultWrapper<Unit> {
+        val request = UpdateEstadoRequest(nuevoEstado)
+        return safeApiCall {
+            apiUser.updateEstado(userId, request)
         }
     }
 }

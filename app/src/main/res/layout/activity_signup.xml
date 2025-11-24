@@ -20,7 +20,6 @@
             android:paddingStart="@dimen/spacing_medium"
             android:paddingEnd="@dimen/spacing_medium">
 
-            <!-- Sección superior verde -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/top_green_section"
                 android:layout_width="match_parent"
@@ -54,7 +53,6 @@
                     app:tint="@color/white" />
             </androidx.constraintlayout.widget.ConstraintLayout>
 
-            <!-- Nombre -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/text_input_layout_name"
                 style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
@@ -76,7 +74,6 @@
                     android:inputType="textPersonName" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Teléfono -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/text_input_layout_phone"
                 style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
@@ -98,7 +95,6 @@
                     android:inputType="phone" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Contraseña -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/input_password_layout"
                 style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
@@ -120,7 +116,6 @@
                     android:inputType="textPassword" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Confirmar contraseña -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/text_input_layout_confirm_password"
                 style="@style/Widget.App.TextInputLayout.OutlinedBox.Green"
@@ -142,7 +137,6 @@
                     android:inputType="textPassword" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Términos (solo texto) -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/terms_container"
                 android:layout_width="0dp"
@@ -153,7 +147,6 @@
                 app:layout_constraintTop_toBottomOf="@id/text_input_layout_confirm_password"
                 app:layout_constraintWidth_percent="0.85"/>
 
-            <!-- Botón Registrar -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_register"
                 style="@style/Widget.App.Button.Primary"
@@ -166,7 +159,6 @@
                 app:layout_constraintTop_toBottomOf="@+id/terms_container"
                 app:layout_constraintWidth_percent="0.85" />
 
-            <!-- Link a Login -->
             <TextView
                 android:id="@+id/text_login_link"
                 style="@style/TextAppearance.App.Link"
@@ -181,4 +173,10 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>
+
+    <include
+        layout="@layout/include_network_error"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

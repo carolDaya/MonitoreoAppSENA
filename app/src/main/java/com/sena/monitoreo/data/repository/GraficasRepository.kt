@@ -1,49 +1,39 @@
 package com.sena.monitoreo.data.repository
 
-
-import android.util.Log
+import com.sena.monitoreo.data.api.ApiGraficas
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.model.admin.GraficaResponse
 import com.sena.monitoreo.data.model.admin.GraficaUpdateRequest
 import com.sena.monitoreo.data.model.admin.GraficaUpdateResponse
-import retrofit2.http.GET
+import com.sena.monitoreo.utils.ResultWrapper
+import com.sena.monitoreo.utils.safeApiCall
 
-class GraficasRepository {
-    private val api = RetrofitClient.apiGraficas
-    private val TAG = "GraficasRepository"
+/**
+ * Repositorio para la configuración de gráficas.
+ */
+class GraficasRepository(
+    // Inyección de dependencia a través del constructor
+    private val apiGraficas: ApiGraficas = RetrofitClient.apiGraficas
+) {
+    /**
+     * Actualiza la configuración de una gráfica.
+     * Retorna ResultWrapper<GraficaUpdateResponse> para tipar el resultado.
+     */
+    suspend fun updateGrafica(sensorId: Int, tipo: String): ResultWrapper<GraficaUpdateResponse> {
+        val requestBody = GraficaUpdateRequest(sensorId, tipo)
 
-    suspend fun updateGrafica(sensorId: Int, tipo: String): GraficaUpdateResponse? {
-        return try {
-            val response = api.updateGrafica(GraficaUpdateRequest(sensorId, tipo))
-            if (response.isSuccessful) {
-                Log.d(TAG, "✅ Gráfica actualizada: sensor=$sensorId, tipo=$tipo")
-                response.body()
-            } else {
-                Log.e(TAG, "❌ Error al actualizar: ${response.code()} - ${response.message()}")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Excepción al actualizar gráfica", e)
-            null
+        return safeApiCall {
+            apiGraficas.updateGrafica(requestBody)
         }
     }
 
-    suspend fun getGraficas(): List<GraficaResponse> {
-        return try {
-            val response = api.getGraficas()
-            if (response.isSuccessful) {
-                val graficas = response.body() ?: emptyList()
-                Log.d(TAG, "✅ Gráficas obtenidas: ${graficas.size}")
-                graficas
-            } else {
-                Log.e(TAG, "❌ Error al obtener gráficas: ${response.code()}")
-                emptyList()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Excepción al obtener gráficas", e)
-            emptyList()
+    /**
+     * Obtiene la lista completa de configuraciones de gráficas.
+     * Retorna ResultWrapper<List<GraficaResponse>>.
+     */
+    suspend fun getGraficas(): ResultWrapper<List<GraficaResponse>> {
+        return safeApiCall {
+            apiGraficas.getGraficas()
         }
     }
-
-
 }

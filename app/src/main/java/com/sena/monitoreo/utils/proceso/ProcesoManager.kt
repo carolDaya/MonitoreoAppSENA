@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.sena.monitoreo.R
 import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModel
@@ -21,53 +22,96 @@ class ProcesoManager(
     private val lifecycleOwner: LifecycleOwner,
     private val onStatusUpdate: (String) -> Unit = {}
 ) {
+    companion object {
+        private const val TAG = "ProcesoManager"
+    }
 
     fun setupProcesoControl() {
-        // 1. Listeners de los botones
+        setupClickListeners()
+        setupObservers()
+        // Cargar estado inicial del proceso
+        procesoViewModel.loadProcesoStatus()
+    }
+
+    private fun setupClickListeners() {
         btnIniciar.setOnClickListener {
+            Log.d(TAG, "Botón Iniciar presionado.")
             procesoViewModel.iniciarProceso()
         }
 
         btnFinalizar.setOnClickListener {
-            // Mostrar diálogo de confirmación antes de finalizar
             mostrarDialogoConfirmacionFinalizar()
         }
+    }
 
-        // 2. Observar el estado de Carga (Loading)
+    private fun setupObservers() {
+        // Observar estado de loading
         procesoViewModel.isLoading.observe(lifecycleOwner) { isLoading ->
-            // Deshabilitar ambos botones durante la operación para evitar doble click
-            btnIniciar.isEnabled = !isLoading && (procesoViewModel.isProcesoActivo.value == false)
-            btnFinalizar.isEnabled = !isLoading && (procesoViewModel.isProcesoActivo.value == true)
-
-            // Mostrar u ocultar la barra de progreso
-            progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+            updateLoadingState(isLoading ?: false)
         }
 
-        // 3. Observar si hay Proceso Activo para actualizar la UI
+        // 💡 CORRECCIÓN: Observar estado del proceso con nombre único
         procesoViewModel.isProcesoActivo.observe(lifecycleOwner) { isActive ->
-            tvEstado.text = if (isActive) "Estado: 🟢 Activo (Monitoreando)" else "Estado: 🔴 Inactivo (Se requiere iniciar proceso)"
-
-            // Habilitar/Deshabilitar botones basado en el estado
-            val isLoading = procesoViewModel.isLoading.value ?: false
-            btnIniciar.isEnabled = !isActive && !isLoading
-            btnFinalizar.isEnabled = isActive && !isLoading
+            handleProcesoStateChange(isActive)
         }
 
-        // 4. Observar el mensaje de Estado (Éxito/Error) - FILTRAR VACÍOS
+        // Observar mensajes de estado
         procesoViewModel.procesoStatus.observe(lifecycleOwner) { message ->
-            // Filtrar mensajes vacíos o que contengan "(mensaje vacío)"
-            val mensajeLimpio = message.trim()
+            handleProcesoStatus(message ?: "")
+        }
+    }
 
-            if (mensajeLimpio.isNotEmpty() && mensajeLimpio != "(mensaje vacío)") {
-                Log.d("ProcesoManager", "✅ Mensaje válido: $mensajeLimpio")
-                onStatusUpdate(mensajeLimpio)
-            } else {
-                Log.d("ProcesoManager", "⏭️ Mensaje vacío omitido: '$message'")
-            }
+    private fun updateLoadingState(isLoading: Boolean) {
+        val isActive = procesoViewModel.isProcesoActivo.value ?: false
+        progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+        btnIniciar.isEnabled = !isLoading && !isActive
+        btnFinalizar.isEnabled = !isLoading && isActive
+    }
+
+    /**
+     * 💡 CORRECCIÓN: Función renombrada para evitar conflicto
+     */
+    private fun handleProcesoStateChange(isActive: Boolean?) {
+        val activo = isActive ?: false
+        val isLoading = procesoViewModel.isLoading.value ?: false
+
+        Log.d(TAG, "🔄 Actualizando UI del proceso. Activo: $activo, Loading: $isLoading")
+
+        // Actualizar visibilidad de botones
+        if (activo) {
+            btnIniciar.visibility = View.GONE
+            btnFinalizar.visibility = View.VISIBLE
+            tvEstado.text = "🟢 Proceso activo"
+            tvEstado.setTextColor(ContextCompat.getColor(context, R.color.turquoise))
+        } else {
+            btnIniciar.visibility = View.VISIBLE
+            btnFinalizar.visibility = View.GONE
+            tvEstado.text = "🔴 Proceso inactivo"
+            tvEstado.setTextColor(ContextCompat.getColor(context, R.color.red))
         }
 
-        // 5. Verificar el estado inicial del proceso al cargar la actividad
-        procesoViewModel.verificarEstadoProceso()
+        // Actualizar estados de botones
+        btnIniciar.isEnabled = !activo && !isLoading
+        btnFinalizar.isEnabled = activo && !isLoading
+    }
+
+    private fun handleProcesoStatus(message: String) {
+        val mensajeLimpio = message.trim()
+
+        if (mensajeLimpio.isNotEmpty() && mensajeLimpio != "(mensaje vacío)") {
+            Log.d(TAG, "✅ Mensaje de estado: $mensajeLimpio")
+
+            // Actualizar estado del TextView si el mensaje es informativo
+            if (mensajeLimpio.contains("Error", ignoreCase = true) ||
+                mensajeLimpio.contains("éxito", ignoreCase = true) ||
+                mensajeLimpio.contains("correctamente", ignoreCase = true)) {
+                tvEstado.text = mensajeLimpio
+            }
+
+            onStatusUpdate(mensajeLimpio)
+        } else {
+            Log.d(TAG, "⏭️ Mensaje vacío omitido: '$message'")
+        }
     }
 
     /**
@@ -78,22 +122,24 @@ class ProcesoManager(
             .setTitle("⚠️ Confirmar Finalización")
             .setMessage("¿Estás seguro de que deseas finalizar el proceso de monitoreo?")
             .setPositiveButton("Sí, Finalizar") { dialog, _ ->
-                // Usuario confirmó, proceder a finalizar
-                Log.d("ProcesoManager", "Usuario confirmó finalización de proceso")
+                Log.d(TAG, "Usuario confirmó finalización de proceso")
                 procesoViewModel.finalizarProceso()
                 dialog.dismiss()
             }
             .setNegativeButton("Cancelar") { dialog, _ ->
-                // Usuario canceló, no hacer nada
-                Log.d("ProcesoManager", "Usuario canceló finalización de proceso")
+                Log.d(TAG, "Usuario canceló finalización de proceso")
                 dialog.dismiss()
             }
-            .setCancelable(true) // Permite cerrar tocando fuera del diálogo
+            .setCancelable(true)
             .create()
             .show()
     }
 
+    /**
+     * Limpieza, aunque los observers de LiveData se limpian automáticamente
+     * cuando el LifecycleOwner se destruye.
+     */
     fun cleanup() {
-        // Los observers se limpian automáticamente cuando el lifecycleOwner se destruye
+        Log.d(TAG, "Cleanup ejecutado. Observers liberados por Lifecycle.")
     }
 }

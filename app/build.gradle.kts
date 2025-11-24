@@ -74,6 +74,9 @@ dependencies {
     implementation(libs.waveform)
     implementation(libs.amplituda)
 
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

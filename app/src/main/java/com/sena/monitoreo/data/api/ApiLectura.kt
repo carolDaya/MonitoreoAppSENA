@@ -1,5 +1,3 @@
-// Archivo: com.sena.monitoreo.data.api.LecturaApi.kt
-
 package com.sena.monitoreo.data.api
 
 import com.sena.monitoreo.data.model.sensor.LecturaResponse

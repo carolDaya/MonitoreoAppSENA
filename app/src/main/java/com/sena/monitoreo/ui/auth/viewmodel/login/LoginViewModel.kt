@@ -1,26 +1,19 @@
-package com.sena.monitoreo.ui.auth
+package com.sena.monitoreo.ui.auth.viewmodel.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sena.monitoreo.data.model.auth.LoginRequest
 import com.sena.monitoreo.data.repository.AuthRepository
-import com.sena.monitoreo.utils.ApiResult
+import com.sena.monitoreo.utils.ResultWrapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.IOException
 
-// Estados que la UI observará
-sealed class LoginUiState {
-    object Idle : LoginUiState()
-    object Loading : LoginUiState()
-    data class Success(val role: String) : LoginUiState()
-    data class Error(val message: String) : LoginUiState()
-}
+class LoginViewModel(
+    private val authRepository: AuthRepository
+) : ViewModel() {
 
-class LoginViewModel : ViewModel() {
-
-    private val authRepository = AuthRepository()
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState = _uiState.asStateFlow()
 
@@ -33,13 +26,14 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = LoginUiState.Loading
             try {
+                // CORRECCIÓN: Usar ResultWrapper
                 when (val result = authRepository.login(LoginRequest(phone, password))) {
-                    is ApiResult.Success -> {
-                        val role = result.data.rol // ← propiedad que devuelve el rol del usuario
+                    is ResultWrapper.Success -> {
+                        val role = result.data.rol
                         _uiState.value = LoginUiState.Success(role)
                     }
 
-                    is ApiResult.Error -> {
+                    is ResultWrapper.Error -> {
                         _uiState.value = LoginUiState.Error(result.message)
                     }
                 }

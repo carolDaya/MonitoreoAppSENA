@@ -9,14 +9,12 @@
     android:fitsSystemWindows="true"
     tools:context=".ui.admin.AdminDashboardActivity">
 
-    <!-- Contenido principal -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/main_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/gray_300">
 
-        <!-- Header -->
         <include
             android:id="@+id/main_header"
             layout="@layout/header_layout_admin"
@@ -26,7 +24,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Contenido scrollable -->
         <androidx.core.widget.NestedScrollView
             android:id="@+id/nested_scroll_view"
             android:layout_width="0dp"
@@ -58,7 +55,6 @@
                     android:layout_marginTop="@dimen/spacing_medium"
                     android:contentDescription="@string/desc_section_ai" />
 
-                <!-- AHORA ES UN INCLUDE REAL CON EL CONTENIDO DE USUARIOS -->
                 <include
                     android:id="@+id/user_admin_section"
                     layout="@layout/include_user_admin"
@@ -70,9 +66,18 @@
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
+
+        <include
+            layout="@layout/include_network_error"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Navigation Drawer -->
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
         android:layout_width="wrap_content"

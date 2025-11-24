@@ -4,9 +4,9 @@ import com.google.gson.annotations.SerializedName
 
 data class LecturaResponse(
     val id: Int,
-    @SerializedName("sensor_id") // 💡 Asegura que mapea el snake_case de Flask
+    @SerializedName("sensor_id")
     val sensorId: Int,
-    @SerializedName("fecha_hora") // 💡 Asegura que mapea el snake_case de Flask
+    @SerializedName("fecha_hora")
     val fechaHora: String,
     val valor: Double,
     val observaciones: String?

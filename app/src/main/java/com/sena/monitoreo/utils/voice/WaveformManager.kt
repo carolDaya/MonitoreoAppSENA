@@ -7,6 +7,10 @@ import kotlin.random.Random
 class WaveformManager(
     private val waveformSeekBar: WaveformSeekBar
 ) {
+    companion object {
+        private const val TAG = "WaveformManager"
+    }
+
     private var animationJob: Job? = null
     private var isAnimating = false
 
@@ -20,19 +24,26 @@ class WaveformManager(
         stopAnimation()
         isAnimating = true
 
-        animationJob = scope.launch {
+        animationJob = scope.launch(Dispatchers.Main) { // Usamos Dispatchers.Main para manipulación de UI
             val estimatedDurationMs = (textLength * 80).toLong().coerceAtLeast(3000L)
             val steps = estimatedDurationMs / 50L
             val progressStep = waveformSeekBar.maxProgress / steps.toFloat()
 
-            for (i in 0 until steps.toInt()) {
-                if (!isAnimating) break
-                waveformSeekBar.progress += progressStep
-                val dynamicSamples = IntArray(100) { Random.nextInt(5, 95) }
-                waveformSeekBar.setSampleFrom(dynamicSamples)
-                delay(50L)
+            try {
+                for (i in 0 until steps.toInt()) {
+                    if (!isAnimating || isActive.not()) break // Verificar isActive
+                    waveformSeekBar.progress += progressStep
+                    val dynamicSamples = IntArray(100) { Random.nextInt(5, 95) }
+                    waveformSeekBar.setSampleFrom(dynamicSamples)
+                    delay(50L)
+                }
+            } catch (e: CancellationException) {
+                // Se canceló la corutina
+            } finally {
+                // Solo llamar al callback si no fue cancelado explícitamente y aún estamos activos
+                if (isActive) onAnimationEnd()
+                stopAnimationCleanup()
             }
-            onAnimationEnd()
         }
     }
 
@@ -40,18 +51,24 @@ class WaveformManager(
         stopAnimation()
         isAnimating = true
 
-        animationJob = scope.launch {
+        animationJob = scope.launch(Dispatchers.Main) {
             val steps = totalDurationMs / 50L
             val progressStep = waveformSeekBar.maxProgress / steps.toFloat()
 
-            for (i in 0 until steps.toInt()) {
-                if (!isAnimating) break
-                waveformSeekBar.progress += progressStep
-                val dynamicSamples = IntArray(100) { Random.nextInt(5, 95) }
-                waveformSeekBar.setSampleFrom(dynamicSamples)
-                delay(50L)
+            try {
+                for (i in 0 until steps.toInt()) {
+                    if (!isAnimating || isActive.not()) break
+                    waveformSeekBar.progress += progressStep
+                    val dynamicSamples = IntArray(100) { Random.nextInt(5, 95) }
+                    waveformSeekBar.setSampleFrom(dynamicSamples)
+                    delay(50L)
+                }
+            } catch (e: CancellationException) {
+                // Se canceló la corutina
+            } finally {
+                if (isActive) onAnimationEnd()
+                stopAnimationCleanup()
             }
-            onAnimationEnd()
         }
     }
 
@@ -59,27 +76,30 @@ class WaveformManager(
         stopAnimation()
         isAnimating = true
 
-        animationJob = scope.launch {
+        animationJob = scope.launch(Dispatchers.Main) {
             var progress = 0f
             val maxProgress = waveformSeekBar.maxProgress
 
-            while (isAnimating) {
-                progress += 2f // Incremento más rápido para mejor visualización
-                if (progress > maxProgress) {
-                    progress = 0f // Reiniciar cuando llega al final
+            try {
+                while (isAnimating && isActive) {
+                    progress += 2f
+                    if (progress > maxProgress) {
+                        progress = 0f
+                    }
+
+                    waveformSeekBar.progress = progress
+
+                    val dynamicSamples = IntArray(100) { Random.nextInt(10, 90) }
+                    waveformSeekBar.setSampleFrom(dynamicSamples)
+
+                    delay(40L)
                 }
-
-                waveformSeekBar.progress = progress
-
-                // Actualizar samples dinámicamente
-                val dynamicSamples = IntArray(100) { Random.nextInt(10, 90) }
-                waveformSeekBar.setSampleFrom(dynamicSamples)
-
-                delay(40L) // 25 FPS para animación más suave
+            } catch (e: CancellationException) {
+                // Se canceló la corutina
+            } finally {
+                if (isActive) onAnimationEnd()
+                stopAnimationCleanup()
             }
-
-            waveformSeekBar.progress = 0f // Reset al finalizar
-            onAnimationEnd()
         }
     }
 
@@ -87,38 +107,38 @@ class WaveformManager(
         stopAnimation()
         isAnimating = true
 
-        animationJob = scope.launch {
+        animationJob = scope.launch(Dispatchers.Main) {
             val startTime = System.currentTimeMillis()
             val endTime = startTime + totalDurationMs
 
-            while (isAnimating && System.currentTimeMillis() < endTime) {
-                val elapsed = System.currentTimeMillis() - startTime
-                val progress = (elapsed.toFloat() / totalDurationMs.toFloat()) * waveformSeekBar.maxProgress
+            try {
+                while (isAnimating && System.currentTimeMillis() < endTime && isActive) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    val progress = (elapsed.toFloat() / totalDurationMs.toFloat()) * waveformSeekBar.maxProgress
 
-                waveformSeekBar.progress = progress.coerceAtMost(waveformSeekBar.maxProgress)
+                    waveformSeekBar.progress = progress.coerceAtMost(waveformSeekBar.maxProgress)
 
-                // Actualizar samples dinámicamente
-                val dynamicSamples = IntArray(100) { Random.nextInt(10, 90) }
-                waveformSeekBar.setSampleFrom(dynamicSamples)
+                    val dynamicSamples = IntArray(100) { Random.nextInt(10, 90) }
+                    waveformSeekBar.setSampleFrom(dynamicSamples)
 
-                delay(40L)
+                    delay(40L)
+                }
+            } catch (e: CancellationException) {
+            } finally {
+                if (isActive) onAnimationEnd()
+                stopAnimationCleanup()
             }
-
-            onAnimationEnd()
         }
+    }
+
+    private fun stopAnimationCleanup() {
+        isAnimating = false
+        animationJob = null
+        waveformSeekBar.progress = 0f
     }
 
     fun stopAnimation() {
         isAnimating = false
         animationJob?.cancel()
-        animationJob = null
-        waveformSeekBar.progress = 0f
     }
-
-    fun reset() {
-        stopAnimation()
-        setupInitialSamples()
-    }
-
-    fun isAnimating(): Boolean = isAnimating
 }

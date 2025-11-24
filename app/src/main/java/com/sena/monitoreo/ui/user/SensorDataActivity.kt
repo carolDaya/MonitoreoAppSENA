@@ -1,48 +1,52 @@
 package com.sena.monitoreo.ui.user
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.ViewModelProvider
+import com.sena.monitoreo.data.model.admin.*
 import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.data.Entry
 import com.sena.monitoreo.R
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.repository.*
 import com.sena.monitoreo.databinding.ActivitySensorDataBinding
-import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModel
-import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModelFactory
 import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModel
-import com.sena.monitoreo.ui.admin.viewmodel.ProcesoViewModelFactory
+import com.sena.monitoreo.ui.admin.factory.ProcesoViewModelFactory
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
+import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
+import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
+import com.sena.monitoreo.utils.ResultWrapper
+import com.sena.monitoreo.utils.NetworkRetryListener
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.alerts.AlertManager
 import com.sena.monitoreo.utils.charts.ChartManager
 import com.sena.monitoreo.utils.navigation.NavigationManager
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
-class SensorDataActivity : BaseVoiceActivity() {
+class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
 
     private lateinit var binding: ActivitySensorDataBinding
     private lateinit var navigationManager: NavigationManager
     private lateinit var alertManager: AlertManager
     private lateinit var chartManager: ChartManager
+    private val TAG = "SensorDataActivity"
 
     // Repositories
     private val graficasRepo = GraficasRepository()
     private val lecturaRepo = LecturaRepository()
     private val analisisRepo = AnalisisRepository(RetrofitClient.apiAi)
+    private val voiceRepo = VoiceRepository(RetrofitClient.apiVoice)
 
     // ViewModels
-    private val viewModel: AdminConfigViewModel by lazy {
-        val repository = VoiceRepository(RetrofitClient.apiVoice)
-        ViewModelProvider(this, AdminConfigViewModelFactory(repository))
-            .get(AdminConfigViewModel::class.java)
+    private val voiceConfigViewModel: VoiceConfigViewModel by lazy {
+        val factory = VoiceConfigViewModelFactory(voiceRepo)
+        ViewModelProvider(this, factory)[VoiceConfigViewModel::class.java]
     }
 
     private val procesoViewModel: ProcesoViewModel by lazy {
@@ -51,34 +55,111 @@ class SensorDataActivity : BaseVoiceActivity() {
             .get(ProcesoViewModel::class.java)
     }
 
-    private val refreshTime = 5 * 60 * 1000L // 5 minutos
+    private val refreshTime = 30 * 1000L // 30 segundos
+    private var cachedConfiguraciones: List<GraficaResponse>? = null
+    private var isFirstLoad = true
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         binding = ActivitySensorDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Configurar manejo de errores de red
+        setupNetworkErrorHandling(binding.root as ViewGroup, this)
+
         initializeManagers()
         setupNavigation()
         setupVoiceConfiguration()
         setupAlertTestButton()
 
-        // Observamos cambios en el proceso activo
+        // Manejar navegación desde el menú
+        handleIntentNavigation()
+
+        // CARGAR CONFIGURACIONES UNA SOLA VEZ AL INICIO
+        lifecycleScope.launch {
+            loadConfiguraciones()
+        }
+
+        // Observar estado del proceso
         procesoViewModel.isProcesoActivo.observe(this) { activo ->
-            lifecycleScope.launch {
-                loadSensorsAndCharts()
+            if (activo != null) {
+                Log.d(TAG, "📊 Estado del proceso OBSERVADO: $activo")
+                lifecycleScope.launch {
+                    loadSensorsAndCharts(activo)
+                }
             }
         }
 
-        // Carga inicial
+        // Cargar estado inicial del proceso
         lifecycleScope.launch {
-            loadSensorsAndCharts()
+            Log.d(TAG, "🔄 Cargando estado inicial del proceso...")
+            procesoViewModel.loadProcesoStatus()
         }
 
-        // Bucle de actualización
         startChartRefreshLoop()
+    }
+
+    /**
+     * Manejar navegación desde intent (scroll a cards específicas)
+     */
+    private fun handleIntentNavigation() {
+        intent.getStringExtra("SENSOR_TYPE")?.let { sensorType ->
+            lifecycleScope.launch {
+                delay(1000) // Esperar a que la UI esté completamente cargada
+                navigateToCard(sensorType)
+            }
+        }
+    }
+
+    /**
+     * Navegación por scroll a cards específicas - MÉTODO PÚBLICO
+     */
+    fun navigateToCard(cardType: String) {
+        Log.d(TAG, "🎯 Navegando a card: $cardType")
+
+        when (cardType.uppercase()) {
+            "GAS" -> {
+                binding.mainScroll.post {
+                    // 💡 CORRECCIÓN: Scroll directo al card específico
+                    val cardView = binding.cardMq4.root
+                    val top = cardView.top
+                    binding.mainScroll.smoothScrollTo(0, top - 150) // Offset para mejor visualización
+                    UiUtils.showSnackbar(binding.root, "Desplazando a Gas Metano", false)
+                }
+            }
+            "TEMP" -> {
+                binding.mainScroll.post {
+                    val cardView = binding.cardTemperatura.root
+                    val top = cardView.top
+                    binding.mainScroll.smoothScrollTo(0, top - 150)
+                    UiUtils.showSnackbar(binding.root, "Desplazando a Temperatura", false)
+                }
+            }
+            "PRESSURE" -> {
+                binding.mainScroll.post {
+                    val cardView = binding.cardPresion.root
+                    val top = cardView.top
+                    binding.mainScroll.smoothScrollTo(0, top - 150)
+                    UiUtils.showSnackbar(binding.root, "Desplazando a Presión", false)
+                }
+            }
+        }
+    }
+
+    override fun onNetworkRetry() {
+        Log.d(TAG, "🔄 Reintentando carga completa...")
+        lifecycleScope.launch {
+            // Ocultar error primero
+            hideNetworkError()
+
+            // Mostrar mensaje de intento
+            UiUtils.showSnackbar(binding.root, "Reconectando...", false)
+
+            // Recargar configuraciones y estado del proceso
+            loadConfiguraciones()
+            procesoViewModel.loadProcesoStatus()
+        }
     }
 
     private fun initializeManagers() {
@@ -89,14 +170,16 @@ class SensorDataActivity : BaseVoiceActivity() {
             onAlertDetected = { alertMessage ->
                 runOnUiThread {
                     showAlert(alertMessage)
-                    val fullAlertMessage = "⚠️ Alerta crítica detectada. $alertMessage. Por favor, revise la pantalla de alertas para más detalles."
-                    speakLongTextWithWaveform(fullAlertMessage)
+                    if (!isNetworkErrorVisible()) {
+                        speakWithWaveform("Alerta crítica detectada")
+                    }
                 }
             },
             onError = { errorMessage ->
                 runOnUiThread {
-                    UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
-                    speakWithWaveform("Error al verificar alertas")
+                    if (!isNetworkErrorVisible()) {
+                        UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
+                    }
                 }
             }
         )
@@ -107,7 +190,8 @@ class SensorDataActivity : BaseVoiceActivity() {
             context = this,
             drawerLayout = binding.containerSensor,
             navigationView = binding.navView,
-            currentActivity = "sensor_data"
+            currentActivity = "sensor_data",
+            view = binding.root
         )
 
         binding.headerUser.settingsIcon.setOnClickListener {
@@ -127,12 +211,34 @@ class SensorDataActivity : BaseVoiceActivity() {
             binding.headerUser.waveformSection.btnPlayMessage
         )
 
-        viewModel.loadCurrentConfig()
-        viewModel.currentConfig.observe(this) { config ->
-            voiceManager.currentPitch = config.pitch
-            voiceManager.currentGender = config.gender
-            if (isVoiceInitialized) {
-                voiceManager.applyTtsSettings()
+        voiceConfigViewModel.loadCurrentConfig()
+
+        lifecycleScope.launch {
+            voiceConfigViewModel.currentConfig.collect { config ->
+                voiceManager.currentPitch = config.voicePitch.toFloat()
+                voiceManager.currentGender = config.voiceGender
+                if (isVoiceInitialized) {
+                    voiceManager.applyTtsSettings()
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            voiceConfigViewModel.uiState.collect { state ->
+                when (state) {
+                    is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
+                        Log.e(TAG, "❌ Error configuración voz: ${state.message}")
+                        if (state.message.contains("Error de red", ignoreCase = true)) {
+                            showNetworkError("Error de voz: ${state.message}")
+                        }
+                    }
+                    VoiceConfigViewModel.VoiceConfigUiState.Success -> {
+                        if (isNetworkErrorVisible()) {
+                            hideNetworkError()
+                        }
+                    }
+                    else -> {}
+                }
             }
         }
     }
@@ -150,171 +256,226 @@ class SensorDataActivity : BaseVoiceActivity() {
             .setMessage("¿Forzar verificación de alerta?")
             .setPositiveButton("Sí") { _, _ ->
                 alertManager.forceAlertCheck(lifecycleScope)
-                UiUtils.showSnackbar(binding.root, "Cooldown reseteado. Verificando...")
+                UiUtils.showSnackbar(binding.root, "Verificando alertas...")
             }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun startChartRefreshLoop() {
         lifecycleScope.launch {
+            delay(5000)
+
             while (true) {
+                if (!isNetworkErrorVisible()) {
+                    Log.d(TAG, "🕒 Refresh automático - Solicitando estado del proceso")
+                    procesoViewModel.loadProcesoStatus()
+                }
                 delay(refreshTime)
-                loadSensorsAndCharts()
             }
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    private suspend fun loadSensorsAndCharts() {
-        try {
-            UiUtils.showLoading(this, "Actualizando datos...")
+    /**
+     * Carga las configuraciones UNA SOLA VEZ al inicio
+     */
+    private suspend fun loadConfiguraciones() {
+        if (isNetworkErrorVisible()) {
+            Log.w(TAG, "⏸️ Saltando carga configuraciones: Error de red visible")
+            return
+        }
 
-            // 1️⃣ Verificar estado real del proceso
-            val hayProcesoActivo = verificarProcesoActivo()
+        Log.d(TAG, "⚙️ Cargando configuraciones de gráficas...")
 
-            // 2️⃣ Cargar configuraciones
-            val configuraciones = graficasRepo.getGraficas()
+        when (val result = graficasRepo.getGraficas()) {
+            is ResultWrapper.Success -> {
+                cachedConfiguraciones = result.data
+                hideNetworkError()
+                Log.d(TAG, "✅ Configuraciones cargadas: ${result.data.size}")
 
-            if (configuraciones.isEmpty()) {
-                // Si no hay configuraciones, mostrar el estado (inactivo/esperando datos)
-                showDefaultCharts(hayProcesoActivo)
-            } else {
-                configuraciones.forEach { config ->
-                    val sensorId = config.sensor_id
-                    val tipoGrafica = config.tipo_grafica
-                    val color = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        chartManager.getSensorColor(sensorId)
-                    } else {
-                        getLegacySensorColor(sensorId)
-                    }
-
-                    val (nombreSensor, cardView) = when (sensorId) {
-                        3 -> "Temperatura" to binding.cardTemperatura.root
-                        2 -> "Presión" to binding.cardPresion.root
-                        1 -> "Metano" to binding.cardMq4.root
-                        else -> return@forEach
-                    }
-
-                    // 3️⃣ Cargar lecturas (solo si el proceso está activo)
-                    val lecturas = if (hayProcesoActivo) {
-                        lecturaRepo.getLecturas(sensorId)
-                    } else {
-                        emptyList() // Sin datos si no hay proceso activo
-                    }
-
-                    if (lecturas.isNotEmpty()) {
-                        // Mostrar datos REALES
-                        val entries = lecturas.mapIndexed { index, lectura ->
-                            Entry(index.toFloat(), lectura.valor.toFloat())
-                        }
-                        chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
-                    } else {
-                        // Mostrar mensaje de estado: Proceso Inactivo o Esperando datos
-                        showNoDataChart(cardView, nombreSensor, hayProcesoActivo)
-                    }
+                if (isFirstLoad) {
+                    isFirstLoad = false
+                    procesoViewModel.loadProcesoStatus()
                 }
             }
+            is ResultWrapper.Error -> {
+                cachedConfiguraciones = null
+                val errorMsg = "Error configuraciones: ${result.message}"
+                Log.e(TAG, "❌ Error configuraciones: ${result.message}")
+                showNetworkError(errorMsg)
+            }
+        }
+    }
 
+    private suspend fun loadSensorsAndCharts(hayProcesoActivo: Boolean) {
+        if (isNetworkErrorVisible()) {
+            Log.w(TAG, "⏸️ Saltando carga sensores: Error de red visible")
+            return
+        }
+
+        val configuraciones = cachedConfiguraciones ?: run {
+            Log.w(TAG, "📭 No hay configuraciones en caché - mostrando gráficas por defecto")
+            runOnUiThread {
+                showDefaultCharts(hayProcesoActivo)
+            }
+            return
+        }
+
+        Log.d(TAG, "🚀 Cargando ${configuraciones.size} sensores. Proceso activo: $hayProcesoActivo")
+
+        if (!hayProcesoActivo || isFirstLoad) {
+            UiUtils.showLoading(this, "Actualizando datos...")
+        }
+
+        try {
+            for (config in configuraciones) {
+                loadSensorData(config, hayProcesoActivo)
+                delay(300)
+            }
         } catch (e: Exception) {
-            UiUtils.showSnackbar(binding.root, "Error cargando gráficas: ${e.message}", true)
-            showDefaultCharts(false)
+            Log.e(TAG, "❌ Error general en carga sensores: ${e.message}", e)
+            showNetworkError("Error: ${e.message}")
         } finally {
             UiUtils.hideLoading()
         }
     }
 
-    private suspend fun verificarProcesoActivo(): Boolean {
-        return try {
-            val response = procesoViewModel.repository.verificarEstado()
-            if (response.isSuccessful) {
-                response.body()?.proceso_activo ?: false
-            } else {
-                false
+    private suspend fun loadSensorData(config: GraficaResponse, hayProcesoActivo: Boolean) {
+        val sensorId = config.sensor_id
+        val tipoGrafica = config.tipo_grafica
+        val color = chartManager.getSensorColor(sensorId)
+
+        val (nombreSensor, cardView) = when (sensorId) {
+            1 -> "Gas Metano" to binding.cardMq4.root
+            2 -> "Presión" to binding.cardPresion.root
+            3 -> "Temperatura" to binding.cardTemperatura.root
+            else -> {
+                Log.w(TAG, "⚠️ Sensor ID desconocido: $sensorId")
+                return
             }
-        } catch (e: Exception) {
-            false
         }
-    }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun showNoDataChart(cardView: android.view.View, sensorName: String, hayProcesoActivo: Boolean) {
-        val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
-        titleTextView?.text = sensorName
+        Log.d(TAG, "📡 Cargando: $nombreSensor (Proceso activo: $hayProcesoActivo)")
 
-        // Ocultar todas las gráficas de MikePhil
-        cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
-        cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
-        cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
-
-        val mensaje = if (hayProcesoActivo) {
-            "⏳ Esperando datos del sensor..."
+        val lecturaResult = if (hayProcesoActivo) {
+            lecturaRepo.getLecturas(sensorId)
         } else {
-            "⏸️ Proceso inactivo - Sin datos"
+            ResultWrapper.Success(emptyList())
         }
 
-        val textView = android.widget.TextView(this).apply {
-            text = mensaje
-            textSize = 16f
-            setTextColor(android.graphics.Color.GRAY)
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 100, 0, 0)
+        when (lecturaResult) {
+            is ResultWrapper.Success -> {
+                val lecturas = lecturaResult.data
+                runOnUiThread {
+                    if (lecturas.isNotEmpty()) {
+                        Log.d(TAG, "✅ $nombreSensor: ${lecturas.size} lecturas")
+                        val entries = lecturas.mapIndexed { index, lectura ->
+                            Entry(index.toFloat(), lectura.valor.toFloat())
+                        }
+                        chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
+                    } else {
+                        Log.w(TAG, "📭 $nombreSensor: Sin lecturas (Proceso activo: $hayProcesoActivo)")
+                        showNoDataChart(cardView, nombreSensor, hayProcesoActivo)
+                    }
+                }
+            }
+            is ResultWrapper.Error -> {
+                Log.e(TAG, "❌ Error $nombreSensor: ${lecturaResult.message}")
+                runOnUiThread {
+                    showNoDataChart(cardView, nombreSensor, hayProcesoActivo,
+                        "❌ Error: ${lecturaResult.message}")
+
+                    if (lecturaResult.message?.contains("Error de red", ignoreCase = true) == true) {
+                        showNetworkError("Error de conexión: ${lecturaResult.message}")
+                    }
+                }
+            }
         }
-
-        val chartContainer = cardView.findViewById<android.view.ViewGroup>(R.id.chart_container)
-        chartContainer?.removeAllViews()
-        chartContainer?.addView(textView)
-    }
-
-    /**
-     * CORRECCIÓN: Esta función ahora solo muestra mensajes de estado.
-     * Se han ELIMINADO los datos falsos (mock entries) que se cargaban.
-     */
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun showDefaultCharts(hayProcesoActivo: Boolean) {
-        showNoDataChart(binding.cardTemperatura.root, "Temperatura", hayProcesoActivo)
-        showNoDataChart(binding.cardPresion.root, "Presión", hayProcesoActivo)
-        showNoDataChart(binding.cardMq4.root, "Metano", hayProcesoActivo)
-    }
-
-    private fun getLegacySensorColor(sensorId: Int): Int = when (sensorId) {
-        2 -> resources.getColor(R.color.temp_color)
-        3 -> resources.getColor(R.color.pressure_color)
-        1 -> resources.getColor(R.color.gas_color)
-        else -> android.graphics.Color.BLACK
     }
 
     override fun onVoiceInitialized() {
+        super.onVoiceInitialized()
+        Log.d(TAG, "🎙️ Voz inicializada - Iniciando verificaciones...")
+
         lifecycleScope.launch {
-            alertManager.checkAndHandleAlert()
+            delay(1000)
+
+            if (!isNetworkErrorVisible()) {
+                alertManager.checkAndHandleAlert()
+                alertManager.startPeriodicAlertCheck(lifecycleScope)
+            }
         }
-        alertManager.startPeriodicAlertCheck(lifecycleScope)
+    }
+
+    private fun showNoDataChart(cardView: android.view.View, sensorName: String,
+                                hayProcesoActivo: Boolean, customMessage: String? = null) {
+        try {
+            val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
+            titleTextView?.text = sensorName
+
+            cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
+            cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
+            cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
+
+            val mensaje = customMessage ?: if (hayProcesoActivo) {
+                "⏳ Esperando datos del sensor..."
+            } else {
+                "⏸️ Proceso inactivo"
+            }
+
+            val chartContainer = cardView.findViewById<android.view.ViewGroup>(R.id.chart_container)
+            chartContainer?.removeAllViews()
+
+            android.widget.TextView(this).apply {
+                text = mensaje
+                textSize = 14f
+                setTextColor(android.graphics.Color.GRAY)
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, 50, 0, 0)
+            }.also { chartContainer?.addView(it) }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mostrando chart vacío: ${e.message}")
+        }
+    }
+
+    private fun showDefaultCharts(hayProcesoActivo: Boolean) {
+        Log.d(TAG, "📊 Mostrando gráficas por defecto. Proceso activo: $hayProcesoActivo")
+        showNoDataChart(binding.cardTemperatura.root, "Temperatura", hayProcesoActivo)
+        showNoDataChart(binding.cardPresion.root, "Presión", hayProcesoActivo)
+        showNoDataChart(binding.cardMq4.root, "Gas Metano", hayProcesoActivo)
     }
 
     override fun startSpeaking() {
         super.startSpeaking()
+        if (isNetworkErrorVisible()) {
+            stopSpeaking()
+            UiUtils.showSnackbar(binding.root, "Error de red. No se puede reproducir audio", true)
+            return
+        }
+
         lifecycleScope.launch {
-            val analisisResult = analisisRepo.analizarLectura()
-            if (analisisResult.success != null) {
-                val analisis = analisisResult.success
-                val fullMessage = formatAnalysisMessage(analisis)
-                speakWithPausesAndWaveform(fullMessage, 1000L)
-            } else {
-                val errorMessage = analisisResult.errorMessage ?: "Error desconocido"
-                runOnUiThread {
-                    UiUtils.showSnackbar(binding.root, errorMessage, true)
+            when (val analisisResult = analisisRepo.analizarLectura()) {
+                is ResultWrapper.Success -> {
+                    val fullMessage = formatAnalysisMessage(analisisResult.data)
+                    speakWithPausesAndWaveform(fullMessage, 1000L)
                 }
-                stopSpeaking()
+                is ResultWrapper.Error -> {
+                    UiUtils.showSnackbar(binding.root, "Error en análisis: ${analisisResult.message}", true)
+                    stopSpeaking()
+
+                    if (analisisResult.message?.contains("Error de red", ignoreCase = true) == true) {
+                        showNetworkError("Error de conexión en análisis: ${analisisResult.message}")
+                    }
+                }
             }
         }
     }
 
     private fun showAlert(message: String) {
-        val intent = Intent(this, AlertsActivity::class.java).apply {
+        startActivity(Intent(this, AlertsActivity::class.java).apply {
             putExtra("alert_message", message)
-        }
-        startActivity(intent)
+        })
     }
 
     override fun onBackPressed() {

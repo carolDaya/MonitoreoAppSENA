@@ -2,6 +2,7 @@ package com.sena.monitoreo.ui.user
 
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -12,30 +13,33 @@ import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.repository.AnalisisRepository
 import com.sena.monitoreo.data.repository.VoiceRepository
 import com.sena.monitoreo.databinding.ActivityAlertsBinding
-import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModel
-import com.sena.monitoreo.ui.admin.viewmodel.AdminConfigViewModelFactory
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
+import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
+import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
+import com.sena.monitoreo.utils.NetworkRetryListener
+import com.sena.monitoreo.utils.ResultWrapper
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.alerts.AlertManager
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class AlertsActivity : BaseVoiceActivity() {
+class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
 
     private lateinit var binding: ActivityAlertsBinding
     private lateinit var alertManager: AlertManager
+    private val TAG = "AlertsActivity"
 
     // Repositories
     private val analisisRepo = AnalisisRepository(RetrofitClient.apiAi)
+    private val voiceRepo = VoiceRepository(RetrofitClient.apiVoice)
 
-    // ViewModel para configuración de voz
-    private val viewModel: AdminConfigViewModel by lazy {
-        val repository = VoiceRepository(RetrofitClient.apiVoice)
-        ViewModelProvider(this, AdminConfigViewModelFactory(repository))
-            .get(AdminConfigViewModel::class.java)
+    private val voiceConfigViewModel: VoiceConfigViewModel by lazy {
+        val factory = VoiceConfigViewModelFactory(voiceRepo)
+        ViewModelProvider(this, factory)[VoiceConfigViewModel::class.java]
     }
 
     // Variables para almacenar TODOS los datos de la alerta
-    private var fullAlertMessage: String = "" // Mensaje completo que se reproducirá
+    private var fullAlertMessage: String = ""
     private var alertData: com.sena.monitoreo.data.model.ai.AnalisisResponse? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,6 +47,9 @@ class AlertsActivity : BaseVoiceActivity() {
         enableEdgeToEdge()
         binding = ActivityAlertsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // 💡 IMPORTANTE: Usar el ConstraintLayout raíz como contenedor padre
+        setupNetworkErrorHandling(binding.alertaLayout as ViewGroup, this)
 
         // Ajustar insets del sistema
         ViewCompat.setOnApplyWindowInsetsListener(binding.alertaLayout) { v, insets ->
@@ -59,13 +66,22 @@ class AlertsActivity : BaseVoiceActivity() {
         loadAlertData()
     }
 
+    /**
+     * Implementación requerida por NetworkRetryListener para reintentar la carga.
+     */
+    override fun onNetworkRetry() {
+        Log.d(TAG, "onNetworkRetry: Reintentando carga de alerta y configuración de voz...")
+        // Reintentar cargar la configuración de voz
+        voiceConfigViewModel.loadCurrentConfig()
+        // Reintentar cargar los datos de la alerta
+        loadAlertData()
+    }
+
     private fun initializeManagers() {
         alertManager = AlertManager(
             context = this,
             analisisRepo = analisisRepo,
-            onAlertDetected = { alertMessage ->
-                // Esta función se usa para alertas periódicas, no necesaria aquí
-            },
+            onAlertDetected = { _ -> /* No necesario aquí */ },
             onError = { errorMessage ->
                 runOnUiThread {
                     UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
@@ -81,12 +97,35 @@ class AlertsActivity : BaseVoiceActivity() {
             binding.waveformSection.btnPlayMessage
         )
 
-        viewModel.loadCurrentConfig()
-        viewModel.currentConfig.observe(this) { config ->
-            voiceManager.currentPitch = config.pitch
-            voiceManager.currentGender = config.gender
-            if (isVoiceInitialized) {
-                voiceManager.applyTtsSettings()
+        // 1. Cargar configuración de voz
+        voiceConfigViewModel.loadCurrentConfig()
+
+        // 2. Observar estado de UI del ViewModel para errores de red
+        lifecycleScope.launch {
+            voiceConfigViewModel.uiState.collectLatest { state ->
+                when (state) {
+                    is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
+                        Log.e(TAG, "Error de Config. Voz: ${state.message}")
+                        showNetworkError(state.message)
+                    }
+                    VoiceConfigViewModel.VoiceConfigUiState.Success -> {
+                        if (isNetworkErrorVisible()) {
+                            hideNetworkError()
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+
+        // 3. Observar datos de configuración de voz
+        lifecycleScope.launch {
+            voiceConfigViewModel.currentConfig.collectLatest { config ->
+                voiceManager.currentPitch = config.voicePitch.toFloat()
+                voiceManager.currentGender = config.voiceGender
+                if (isVoiceInitialized) {
+                    voiceManager.applyTtsSettings()
+                }
             }
         }
     }
@@ -110,8 +149,8 @@ class AlertsActivity : BaseVoiceActivity() {
      * Carga los datos completos de la alerta desde el backend o maneja el error.
      */
     private fun loadAlertData() {
-        // Si ya tenemos un mensaje del intent, no necesitamos cargar más datos
-        if (fullAlertMessage.isNotEmpty()) {
+        // Bloquear si ya tenemos mensaje o si el error de red está visible
+        if (fullAlertMessage.isNotEmpty() || isNetworkErrorVisible()) {
             return
         }
 
@@ -121,26 +160,27 @@ class AlertsActivity : BaseVoiceActivity() {
             try {
                 val analisisResult = analisisRepo.analizarLectura()
 
-                if (analisisResult.success != null) {
-                    // CASO 1: ÉXITO (Respuesta 200 OK)
-                    val analisis = analisisResult.success
+                when (analisisResult) {
+                    is ResultWrapper.Success -> {
+                        val analisis = analisisResult.data
 
-                    // Aseguramos que solo se muestre si el backend indica alerta activa (alerta_ia == 1)
-                    if (analisis.alerta_ia == 1) {
-                        handleAlertData(analisis)
-                    } else {
-                        // Si el 200 OK no contiene alerta activa
-                        handleNoActiveAlerts()
+                        if (analisis.alerta_ia == 1) {
+                            handleAlertData(analisis)
+                            hideNetworkError()
+                        } else {
+                            handleNoActiveAlerts()
+                        }
                     }
-                } else if (analisisResult.errorMessage != null) {
-                    // CASO 2: ERROR CONTROLADO
-                    handleError(analisisResult.errorMessage)
-                } else {
-                    // CASO 3: Error de red o desconocido
-                    handleError("Error de conexión al cargar la alerta.")
+                    is ResultWrapper.Error -> {
+                        val errorMsg = analisisResult.message ?: "Error desconocido"
+                        handleError(errorMsg)
+                        showNetworkError(errorMsg)
+                    }
                 }
             } catch (e: Exception) {
-                handleError("Error inesperado: ${e.message}")
+                val errorMsg = "Error inesperado: ${e.message}"
+                handleError(errorMsg)
+                showNetworkError(errorMsg)
             } finally {
                 UiUtils.hideLoading()
             }
@@ -182,6 +222,7 @@ class AlertsActivity : BaseVoiceActivity() {
         binding.iaResponseText.text = fallbackMessage
         fullAlertMessage = fallbackMessage
         Log.w(TAG, "⚠️ Backend OK, pero no se detectó alerta activa")
+        hideNetworkError()
     }
 
     private fun handleError(errorMessage: String) {
@@ -194,8 +235,8 @@ class AlertsActivity : BaseVoiceActivity() {
     }
 
     override fun onVoiceInitialized() {
-        // Cuando la voz esté lista, reproducir automáticamente si hay mensaje
-        if (fullAlertMessage.isNotEmpty()) {
+        // Cuando la voz esté lista, reproducir automáticamente si hay mensaje y no hay error de red
+        if (fullAlertMessage.isNotEmpty() && !isNetworkErrorVisible()) {
             startAutoPlay()
         }
     }
@@ -210,14 +251,17 @@ class AlertsActivity : BaseVoiceActivity() {
 
     override fun startSpeaking() {
         super.startSpeaking()
+        // No reproducir si hay un error de red visible
+        if (isNetworkErrorVisible()) {
+            stopSpeaking()
+            return
+        }
 
         if (alertData != null) {
-            // 🔊 USAR MÉTODO MEJORADO CON WAVEFORM CONTINUO
             val fullMessage = formatAnalysisMessage(alertData!!)
             speakLongTextWithContinuousWaveform(fullMessage)
             Log.d(TAG, "🔊 Reproduciendo mensaje largo con waveform continuo: ${fullMessage.length} caracteres")
         } else if (fullAlertMessage.isNotEmpty()) {
-            // Mensaje simple del intent - también usar método continuo
             speakLongTextWithContinuousWaveform(fullAlertMessage)
             Log.d(TAG, "🔊 Reproduciendo mensaje del intent con waveform continuo: ${fullAlertMessage.length} caracteres")
         }
@@ -231,9 +275,5 @@ class AlertsActivity : BaseVoiceActivity() {
     override fun onDestroy() {
         super.onDestroy()
         // AlertManager no necesita stop aquí ya que no iniciamos verificación periódica
-    }
-
-    companion object {
-        private const val TAG = "AlertsActivity"
     }
 }

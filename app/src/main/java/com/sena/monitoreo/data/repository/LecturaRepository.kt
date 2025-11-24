@@ -1,34 +1,24 @@
 package com.sena.monitoreo.data.repository
 
-import android.util.Log
+import com.sena.monitoreo.data.api.ApiLectura
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.model.sensor.LecturaResponse
+import com.sena.monitoreo.utils.ResultWrapper
+import com.sena.monitoreo.utils.safeApiCall
 
-class LecturaRepository {
-    private val api = RetrofitClient.apiLecturas
-    private val TAG = "LecturaRepository"
-
+/**
+ * Repositorio para la gestión de lecturas de sensores.
+ */
+class LecturaRepository(
+    private val apiLectura: ApiLectura = RetrofitClient.apiLecturas
+) {
     /**
      * Obtiene las lecturas de un sensor.
-     * El backend (Flask) se encarga de FILTRAR automáticamente por el proceso activo.
+     * @return ResultWrapper con la lista de lecturas o un objeto Error.
      */
-    suspend fun getLecturas(sensorId: Int): List<LecturaResponse> {
-        return try {
-            // Llama al endpoint /lecturas/{sensorId} que ahora es filtrado por proceso activo
-            val response = api.getLecturasPorSensor(sensorId)
-            if (response.isSuccessful) {
-                val lecturas = response.body() ?: emptyList()
-
-                // Si lecturas es vacía, significa: A) Proceso inactivo O B) Proceso activo sin datos aún.
-                Log.d(TAG, "✅ Lecturas obtenidas para sensor $sensorId: ${lecturas.size}")
-                lecturas
-            } else {
-                Log.e(TAG, "❌ Error al obtener lecturas: ${response.code()}. Cuerpo: ${response.errorBody()?.string()}")
-                emptyList()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Excepción al obtener lecturas para sensor $sensorId", e)
-            emptyList()
+    suspend fun getLecturas(sensorId: Int): ResultWrapper<List<LecturaResponse>> {
+        return safeApiCall {
+            apiLectura.getLecturasPorSensor(sensorId)
         }
     }
 }
