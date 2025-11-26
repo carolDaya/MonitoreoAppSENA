@@ -82,14 +82,6 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- 💡 LAYOUT DE ERROR - ESTE SE MUESTRA SOLO CUANDO HAY ERROR -->
-        <include
-            layout="@layout/include_network_error"
-            android:id="@+id/network_error_layout"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
-
     </FrameLayout>
 
     <!-- NAVEGACIÓN LATERAL -->

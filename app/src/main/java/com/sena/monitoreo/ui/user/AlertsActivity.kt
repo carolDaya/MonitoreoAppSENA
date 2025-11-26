@@ -2,13 +2,11 @@ package com.sena.monitoreo.ui.user
 
 import android.os.Bundle
 import android.util.Log
-import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.sena.monitoreo.R
 import com.sena.monitoreo.data.api.RetrofitClient
 import com.sena.monitoreo.data.repository.AnalisisRepository
 import com.sena.monitoreo.data.repository.VoiceRepository
@@ -16,14 +14,13 @@ import com.sena.monitoreo.databinding.ActivityAlertsBinding
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
 import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
 import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
-import com.sena.monitoreo.utils.NetworkRetryListener
 import com.sena.monitoreo.utils.ResultWrapper
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.alerts.AlertManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
+class AlertsActivity : BaseVoiceActivity() {
 
     private lateinit var binding: ActivityAlertsBinding
     private lateinit var alertManager: AlertManager
@@ -48,8 +45,7 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
         binding = ActivityAlertsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 💡 IMPORTANTE: Usar el ConstraintLayout raíz como contenedor padre
-        setupNetworkErrorHandling(binding.alertaLayout as ViewGroup, this)
+        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         // Ajustar insets del sistema
         ViewCompat.setOnApplyWindowInsetsListener(binding.alertaLayout) { v, insets ->
@@ -66,9 +62,6 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
         loadAlertData()
     }
 
-    /**
-     * Implementación requerida por NetworkRetryListener para reintentar la carga.
-     */
     override fun onNetworkRetry() {
         Log.d(TAG, "onNetworkRetry: Reintentando carga de alerta y configuración de voz...")
         // Reintentar cargar la configuración de voz
@@ -84,7 +77,11 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
             onAlertDetected = { _ -> /* No necesario aquí */ },
             onError = { errorMessage ->
                 runOnUiThread {
-                    UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
+                    // Solo mostrar snackbar si no es un error de red
+                    if (!errorMessage.contains("Error de red", ignoreCase = true) &&
+                        !errorMessage.contains("IOException", ignoreCase = true)) {
+                        UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
+                    }
                 }
             }
         )
@@ -97,34 +94,45 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
             binding.waveformSection.btnPlayMessage
         )
 
-        // 1. Cargar configuración de voz
+        // 1. Cargar configuración de voz UNA SOLA VEZ al inicio
         voiceConfigViewModel.loadCurrentConfig()
 
-        // 2. Observar estado de UI del ViewModel para errores de red
+        // 2. Observar cambios de configuración de manera CENTRALIZADA
+        lifecycleScope.launch {
+            voiceConfigViewModel.currentConfig.collectLatest { config ->
+                Log.d(TAG, "🔄 Nueva configuración de voz recibida: ${config.voiceGender}, pitch: ${config.voicePitch}")
+
+                // Aplicar configuración inmediatamente
+                voiceManager.currentPitch = config.voicePitch.toFloat()
+                voiceManager.currentGender = config.voiceGender
+
+                // Forzar re-aplicación de settings si TTS ya está inicializado
+                if (isVoiceInitialized) {
+                    voiceManager.applyTtsSettings()
+                    Log.d(TAG, "✅ Configuración de voz aplicada: ${config.voiceGender}")
+                }
+            }
+        }
+
+        // 3. Observar solo errores de red (separado del flujo de datos)
         lifecycleScope.launch {
             voiceConfigViewModel.uiState.collectLatest { state ->
                 when (state) {
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
                         Log.e(TAG, "Error de Config. Voz: ${state.message}")
-                        showNetworkError(state.message)
-                    }
-                    VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        if (isNetworkErrorVisible()) {
-                            hideNetworkError()
+                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                        if (state.message.contains("Error de red", ignoreCase = true) ||
+                            state.message.contains("IOException", ignoreCase = true)) {
+                            showNetworkError(state.message)
+                        } else {
+                            // Mostrar otros errores como snackbar
+                            UiUtils.showSnackbar(binding.root, state.message, true)
                         }
                     }
+                    VoiceConfigViewModel.VoiceConfigUiState.Success -> {
+                        // Éxito en la carga - no necesita acción específica
+                    }
                     else -> {}
-                }
-            }
-        }
-
-        // 3. Observar datos de configuración de voz
-        lifecycleScope.launch {
-            voiceConfigViewModel.currentConfig.collectLatest { config ->
-                voiceManager.currentPitch = config.voicePitch.toFloat()
-                voiceManager.currentGender = config.voiceGender
-                if (isVoiceInitialized) {
-                    voiceManager.applyTtsSettings()
                 }
             }
         }
@@ -149,8 +157,8 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
      * Carga los datos completos de la alerta desde el backend o maneja el error.
      */
     private fun loadAlertData() {
-        // Bloquear si ya tenemos mensaje o si el error de red está visible
-        if (fullAlertMessage.isNotEmpty() || isNetworkErrorVisible()) {
+        // Bloquear si ya tenemos mensaje
+        if (fullAlertMessage.isNotEmpty()) {
             return
         }
 
@@ -166,7 +174,6 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
 
                         if (analisis.alerta_ia == 1) {
                             handleAlertData(analisis)
-                            hideNetworkError()
                         } else {
                             handleNoActiveAlerts()
                         }
@@ -174,13 +181,21 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
                     is ResultWrapper.Error -> {
                         val errorMsg = analisisResult.message ?: "Error desconocido"
                         handleError(errorMsg)
-                        showNetworkError(errorMsg)
+                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                        if (errorMsg.contains("Error de red", ignoreCase = true) ||
+                            errorMsg.contains("IOException", ignoreCase = true)) {
+                            showNetworkError(errorMsg)
+                        }
                     }
                 }
             } catch (e: Exception) {
                 val errorMsg = "Error inesperado: ${e.message}"
                 handleError(errorMsg)
-                showNetworkError(errorMsg)
+                // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                if (errorMsg.contains("Error de red", ignoreCase = true) ||
+                    errorMsg.contains("IOException", ignoreCase = true)) {
+                    showNetworkError(errorMsg)
+                }
             } finally {
                 UiUtils.hideLoading()
             }
@@ -222,7 +237,6 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
         binding.iaResponseText.text = fallbackMessage
         fullAlertMessage = fallbackMessage
         Log.w(TAG, "⚠️ Backend OK, pero no se detectó alerta activa")
-        hideNetworkError()
     }
 
     private fun handleError(errorMessage: String) {
@@ -230,14 +244,32 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
         runOnUiThread {
             binding.iaResponseText.text = errorMessage
             fullAlertMessage = errorMessage
-            UiUtils.showSnackbar(binding.root, errorMessage, true)
+            // Solo mostrar snackbar si no es un error de red
+            if (!errorMessage.contains("Error de red", ignoreCase = true) &&
+                !errorMessage.contains("IOException", ignoreCase = true)) {
+                UiUtils.showSnackbar(binding.root, errorMessage, true)
+            }
         }
     }
 
     override fun onVoiceInitialized() {
-        // Cuando la voz esté lista, reproducir automáticamente si hay mensaje y no hay error de red
-        if (fullAlertMessage.isNotEmpty() && !isNetworkErrorVisible()) {
-            startAutoPlay()
+        // Cuando la voz esté lista, SINCRONIZAR configuración actual
+        lifecycleScope.launch {
+            // Pequeño delay para asegurar que TTS esté completamente listo
+            kotlinx.coroutines.delay(100)
+
+            // Forzar aplicación de settings actuales
+            voiceConfigViewModel.currentConfig.value?.let { config ->
+                voiceManager.currentPitch = config.voicePitch.toFloat()
+                voiceManager.currentGender = config.voiceGender
+                voiceManager.applyTtsSettings()
+                Log.d(TAG, "🎯 Configuración sincronizada en onVoiceInitialized: ${config.voiceGender}")
+            }
+
+            // Solo entonces reproducir si hay mensaje
+            if (fullAlertMessage.isNotEmpty()) {
+                startAutoPlay()
+            }
         }
     }
 
@@ -250,12 +282,19 @@ class AlertsActivity : BaseVoiceActivity(), NetworkRetryListener {
     }
 
     override fun startSpeaking() {
-        super.startSpeaking()
-        // No reproducir si hay un error de red visible
-        if (isNetworkErrorVisible()) {
-            stopSpeaking()
-            return
+        // VERIFICAR configuración actual antes de hablar
+        voiceConfigViewModel.currentConfig.value?.let { config ->
+            if (voiceManager.currentGender != config.voiceGender ||
+                voiceManager.currentPitch != config.voicePitch.toFloat()) {
+
+                Log.w(TAG, "⚠️ Configuración desincronizada, re-aplicando...")
+                voiceManager.currentPitch = config.voicePitch.toFloat()
+                voiceManager.currentGender = config.voiceGender
+                voiceManager.applyTtsSettings()
+            }
         }
+
+        super.startSpeaking()
 
         if (alertData != null) {
             val fullMessage = formatAnalysisMessage(alertData!!)

@@ -26,7 +26,6 @@ class LoginViewModel(
         viewModelScope.launch {
             _uiState.value = LoginUiState.Loading
             try {
-                // CORRECCIÓN: Usar ResultWrapper
                 when (val result = authRepository.login(LoginRequest(phone, password))) {
                     is ResultWrapper.Success -> {
                         val role = result.data.rol

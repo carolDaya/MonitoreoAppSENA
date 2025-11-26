@@ -53,9 +53,13 @@ class VoiceManager(
     fun setOnUtteranceCompletedListener(listener: () -> Unit) {
         this.onUtteranceCompleted = listener
     }
-
     fun applyTtsSettings() {
-        if (tts == null || !isReady) return
+        if (tts == null || !isReady) {
+            Log.w(TAG, "TTS no está listo para aplicar settings")
+            return
+        }
+
+        Log.d(TAG, "🎯 Aplicando configuración: $currentGender, pitch: $currentPitch")
 
         val locale = Locale("es", "ES")
         val result = tts?.setLanguage(locale)
@@ -65,18 +69,30 @@ class VoiceManager(
         }
 
         when (currentGender.uppercase()) {
-            "MALE" -> setupMaleVoice(locale)
-            "FEMALE" -> setupFemaleVoice(locale)
-            "ROBOTIC" -> setupRoboticVoice()
-            else -> setupFemaleVoice(locale)
+            "MALE" -> {
+                setupMaleVoice(locale)
+                Log.d(TAG, "🔊 Voz masculina configurada")
+            }
+            "FEMALE" -> {
+                setupFemaleVoice(locale)
+                Log.d(TAG, "🔊 Voz femenina configurada")
+            }
+            "ROBOTIC" -> {
+                setupRoboticVoice()
+                Log.d(TAG, "🔊 Voz robótica configurada")
+            }
+            else -> {
+                setupFemaleVoice(locale)
+                Log.w(TAG, "⚠️ Género no reconocido, usando femenino por defecto")
+            }
         }
 
         tts?.setPitch(mapPitchValue(currentPitch))
         tts?.setSpeechRate(mapSpeechRateValue(currentRate))
 
         setupProgressListener()
+        Log.d(TAG, "✅ Configuración de voz aplicada exitosamente")
     }
-
     private fun setupProgressListener() {
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {isSpeaking = true }

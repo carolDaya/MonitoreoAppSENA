@@ -2,7 +2,6 @@ package com.sena.monitoreo.ui.user
 
 import android.os.Bundle
 import android.util.Log
-import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.ViewModelProvider
@@ -14,13 +13,12 @@ import com.sena.monitoreo.databinding.ActivityHomeUserBinding
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
 import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
 import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
-import com.sena.monitoreo.utils.NetworkRetryListener
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.navigation.NavigationManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class HomeUserActivity : BaseVoiceActivity(), NetworkRetryListener {
+class HomeUserActivity : BaseVoiceActivity() {
 
     private lateinit var binding: ActivityHomeUserBinding
     private lateinit var navigationManager: NavigationManager
@@ -41,22 +39,18 @@ class HomeUserActivity : BaseVoiceActivity(), NetworkRetryListener {
         binding = ActivityHomeUserBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // 1. Inicializar el manejo de errores de red en el layout raíz
-        setupNetworkErrorHandling(binding.homeAdmin as ViewGroup, this)
+        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         setupNavigation()
         setupVoiceConfiguration()
 
-        // 3. Iniciar la carga de la configuración de voz
+        // Iniciar la carga de la configuración de voz
         viewModel.loadCurrentConfig()
     }
 
-    /**
-     * 🔑 IMPLEMENTACIÓN CLAVE: Lógica de reintento de red.
-     */
     override fun onNetworkRetry() {
         Log.d(TAG, "onNetworkRetry: Reintentando carga de configuración de voz.")
-        // El BaseActivity ya ocultó la vista, solo iniciamos la recarga del ViewModel
+        // Reintentar la carga de la configuración de voz
         viewModel.loadCurrentConfig()
     }
 
@@ -66,7 +60,7 @@ class HomeUserActivity : BaseVoiceActivity(), NetworkRetryListener {
             drawerLayout = binding.homeAdmin,
             navigationView = binding.navView,
             currentActivity = "home",
-            view = binding.root // Aseguramos que el constructor de NavigationManager reciba 'view' si es necesario
+            view = binding.root
         )
 
         binding.mainHeader.settingsIcon.setOnClickListener {
@@ -91,13 +85,17 @@ class HomeUserActivity : BaseVoiceActivity(), NetworkRetryListener {
                     }
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
                         Log.e(TAG, "Error de Config. Voz: ${state.message}")
-                        // Si es un error, mostrar la pantalla de error de red
-                        showNetworkError(state.message)
-                        UiUtils.showSnackbar(binding.root, "No se pudo cargar la configuración de voz.")
+                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                        if (state.message.contains("Error de red", ignoreCase = true) ||
+                            state.message.contains("IOException", ignoreCase = true)) {
+                            showNetworkError(state.message)
+                        } else {
+                            // Mostrar otros errores como snackbar
+                            UiUtils.showSnackbar(binding.root, state.message, isError = true)
+                        }
                     }
                     VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        // Éxito: ocultar cualquier error previo
-                        hideNetworkError()
+                        // Éxito en la carga - no necesita acción específica
                     }
                     VoiceConfigViewModel.VoiceConfigUiState.Idle -> {}
                 }
@@ -126,6 +124,9 @@ class HomeUserActivity : BaseVoiceActivity(), NetworkRetryListener {
             voiceManager.currentGender = config.voiceGender
             voiceManager.applyTtsSettings()
         }
+
+        // Reproducir mensaje de bienvenida
+        startSpeaking()
     }
 
     override fun startSpeaking() {

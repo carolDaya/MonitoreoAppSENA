@@ -3,7 +3,6 @@ package com.sena.monitoreo.ui.user
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
@@ -21,7 +20,6 @@ import com.sena.monitoreo.ui.base.BaseVoiceActivity
 import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
 import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
 import com.sena.monitoreo.utils.ResultWrapper
-import com.sena.monitoreo.utils.NetworkRetryListener
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.alerts.AlertManager
 import com.sena.monitoreo.utils.charts.ChartManager
@@ -29,7 +27,7 @@ import com.sena.monitoreo.utils.navigation.NavigationManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
-class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
+class SensorDataActivity : BaseVoiceActivity() {
 
     private lateinit var binding: ActivitySensorDataBinding
     private lateinit var navigationManager: NavigationManager
@@ -65,8 +63,7 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
         binding = ActivitySensorDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Configurar manejo de errores de red
-        setupNetworkErrorHandling(binding.root as ViewGroup, this)
+        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         initializeManagers()
         setupNavigation()
@@ -150,9 +147,6 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
     override fun onNetworkRetry() {
         Log.d(TAG, "🔄 Reintentando carga completa...")
         lifecycleScope.launch {
-            // Ocultar error primero
-            hideNetworkError()
-
             // Mostrar mensaje de intento
             UiUtils.showSnackbar(binding.root, "Reconectando...", false)
 
@@ -170,14 +164,14 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
             onAlertDetected = { alertMessage ->
                 runOnUiThread {
                     showAlert(alertMessage)
-                    if (!isNetworkErrorVisible()) {
-                        speakWithWaveform("Alerta crítica detectada")
-                    }
+                    speakWithWaveform("Alerta crítica detectada")
                 }
             },
             onError = { errorMessage ->
                 runOnUiThread {
-                    if (!isNetworkErrorVisible()) {
+                    // Solo mostrar snackbar si no es un error de red
+                    if (!errorMessage.contains("Error de red", ignoreCase = true) &&
+                        !errorMessage.contains("IOException", ignoreCase = true)) {
                         UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
                     }
                 }
@@ -228,14 +222,16 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
                 when (state) {
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
                         Log.e(TAG, "❌ Error configuración voz: ${state.message}")
-                        if (state.message.contains("Error de red", ignoreCase = true)) {
+                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                        if (state.message.contains("Error de red", ignoreCase = true) ||
+                            state.message.contains("IOException", ignoreCase = true)) {
                             showNetworkError("Error de voz: ${state.message}")
+                        } else {
+                            UiUtils.showSnackbar(binding.root, "Error de voz: ${state.message}", true)
                         }
                     }
                     VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        if (isNetworkErrorVisible()) {
-                            hideNetworkError()
-                        }
+                        // Éxito en la carga - no necesita acción específica
                     }
                     else -> {}
                 }
@@ -267,10 +263,8 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
             delay(5000)
 
             while (true) {
-                if (!isNetworkErrorVisible()) {
-                    Log.d(TAG, "🕒 Refresh automático - Solicitando estado del proceso")
-                    procesoViewModel.loadProcesoStatus()
-                }
+                Log.d(TAG, "🕒 Refresh automático - Solicitando estado del proceso")
+                procesoViewModel.loadProcesoStatus()
                 delay(refreshTime)
             }
         }
@@ -280,17 +274,11 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
      * Carga las configuraciones UNA SOLA VEZ al inicio
      */
     private suspend fun loadConfiguraciones() {
-        if (isNetworkErrorVisible()) {
-            Log.w(TAG, "⏸️ Saltando carga configuraciones: Error de red visible")
-            return
-        }
-
         Log.d(TAG, "⚙️ Cargando configuraciones de gráficas...")
 
         when (val result = graficasRepo.getGraficas()) {
             is ResultWrapper.Success -> {
                 cachedConfiguraciones = result.data
-                hideNetworkError()
                 Log.d(TAG, "✅ Configuraciones cargadas: ${result.data.size}")
 
                 if (isFirstLoad) {
@@ -302,17 +290,18 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
                 cachedConfiguraciones = null
                 val errorMsg = "Error configuraciones: ${result.message}"
                 Log.e(TAG, "❌ Error configuraciones: ${result.message}")
-                showNetworkError(errorMsg)
+                // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                if (result.message?.contains("Error de red", ignoreCase = true) == true ||
+                    result.message?.contains("IOException", ignoreCase = true) == true) {
+                    showNetworkError(errorMsg)
+                } else {
+                    UiUtils.showSnackbar(binding.root, errorMsg, true)
+                }
             }
         }
     }
 
     private suspend fun loadSensorsAndCharts(hayProcesoActivo: Boolean) {
-        if (isNetworkErrorVisible()) {
-            Log.w(TAG, "⏸️ Saltando carga sensores: Error de red visible")
-            return
-        }
-
         val configuraciones = cachedConfiguraciones ?: run {
             Log.w(TAG, "📭 No hay configuraciones en caché - mostrando gráficas por defecto")
             runOnUiThread {
@@ -334,7 +323,13 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error general en carga sensores: ${e.message}", e)
-            showNetworkError("Error: ${e.message}")
+            // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+            if (e.message?.contains("Error de red", ignoreCase = true) == true ||
+                e.message?.contains("IOException", ignoreCase = true) == true) {
+                showNetworkError("Error: ${e.message}")
+            } else {
+                UiUtils.showSnackbar(binding.root, "Error: ${e.message}", true)
+            }
         } finally {
             UiUtils.hideLoading()
         }
@@ -385,7 +380,9 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
                     showNoDataChart(cardView, nombreSensor, hayProcesoActivo,
                         "❌ Error: ${lecturaResult.message}")
 
-                    if (lecturaResult.message?.contains("Error de red", ignoreCase = true) == true) {
+                    // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                    if (lecturaResult.message?.contains("Error de red", ignoreCase = true) == true ||
+                        lecturaResult.message?.contains("IOException", ignoreCase = true) == true) {
                         showNetworkError("Error de conexión: ${lecturaResult.message}")
                     }
                 }
@@ -400,10 +397,8 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
         lifecycleScope.launch {
             delay(1000)
 
-            if (!isNetworkErrorVisible()) {
-                alertManager.checkAndHandleAlert()
-                alertManager.startPeriodicAlertCheck(lifecycleScope)
-            }
+            alertManager.checkAndHandleAlert()
+            alertManager.startPeriodicAlertCheck(lifecycleScope)
         }
     }
 
@@ -448,12 +443,6 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
 
     override fun startSpeaking() {
         super.startSpeaking()
-        if (isNetworkErrorVisible()) {
-            stopSpeaking()
-            UiUtils.showSnackbar(binding.root, "Error de red. No se puede reproducir audio", true)
-            return
-        }
-
         lifecycleScope.launch {
             when (val analisisResult = analisisRepo.analizarLectura()) {
                 is ResultWrapper.Success -> {
@@ -464,7 +453,9 @@ class SensorDataActivity : BaseVoiceActivity(), NetworkRetryListener {
                     UiUtils.showSnackbar(binding.root, "Error en análisis: ${analisisResult.message}", true)
                     stopSpeaking()
 
-                    if (analisisResult.message?.contains("Error de red", ignoreCase = true) == true) {
+                    // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
+                    if (analisisResult.message?.contains("Error de red", ignoreCase = true) == true ||
+                        analisisResult.message?.contains("IOException", ignoreCase = true) == true) {
                         showNetworkError("Error de conexión en análisis: ${analisisResult.message}")
                     }
                 }

@@ -219,14 +219,5 @@
             app:layout_constraintTop_toBottomOf="@id/bottom_sheet_handle"
             app:layout_constraintWidth_percent="0.85"
             app:backgroundTint="@null" />
-
-
     </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <include
-        layout="@layout/include_network_error"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        />
-
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

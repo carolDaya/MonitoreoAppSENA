@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
@@ -29,8 +28,6 @@ import com.sena.monitoreo.ui.admin.viewmodel.*
 import com.sena.monitoreo.utils.charts.AdminChartManager
 import com.sena.monitoreo.utils.navigation.NavigationManager
 import com.sena.monitoreo.utils.voice.VoiceConfigHelper
-import com.sena.monitoreo.utils.voice.VoiceManager
-// import com.sena.monitoreo.utils.voice.WaveformManager // ❌ ELIMINADO para evitar conflicto
 import com.sena.monitoreo.utils.UiUtils
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.button.MaterialButton
@@ -39,12 +36,11 @@ import com.sena.monitoreo.ui.admin.factory.AdminConfigViewModelFactory
 import com.sena.monitoreo.ui.admin.factory.UserViewModelFactory
 import com.sena.monitoreo.ui.admin.factory.ProcesoViewModelFactory
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
-import com.sena.monitoreo.utils.NetworkRetryListener
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.IOException
 
-class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
+class AdminDashboardActivity : BaseVoiceActivity() {
 
     private lateinit var binding: ActivityAdminDashboardBinding
     private lateinit var headerBinding: HeaderLayoutAdminBinding
@@ -57,7 +53,6 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
 
     // Managers / Helpers
     private lateinit var navigationManager: NavigationManager
-    // private lateinit var waveformManager: WaveformManager // ❌ Eliminada la re-declaración. Usar la heredada.
     private lateinit var chartManager: AdminChartManager
     private lateinit var voiceConfigHelper: VoiceConfigHelper
 
@@ -84,7 +79,7 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
         binding = ActivityAdminDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupNetworkErrorHandling(binding.adminDashboard as ViewGroup, this)
+        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         initializeManagers()
         setupNavigationDrawer()
@@ -104,12 +99,12 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
     }
 
     // ----------------------------------------------------------
-    // 💡 Implementación de NetworkRetryListener
+    // 💡 Implementación de NetworkRetryListener (Heredado de BaseActivity)
     // ----------------------------------------------------------
     override fun onNetworkRetry() {
-        // ❌ Reemplazar 'chartManager.reloadAllCharts()' con una llamada de recarga válida.
-        // Asumiendo que loadInitialCharts puede forzar una recarga o hay un método específico.
-        // Si tienes un método específico en AdminChartManager (ej. reloadData), úsalo.
+        Log.d(TAG, "🔄 Reintentando conexión desde NetworkErrorActivity...")
+
+        // Recargar todos los datos que puedan haber fallado por red
         chartManager.loadInitialCharts(
             binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp,
             binding.graficasAdminSection.graphContainerPressure, binding.graficasAdminSection.btnChangePressure,
@@ -118,8 +113,6 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
 
         adminConfigViewModel.loadCurrentConfig()
         userViewModel.loadAllUsers(getCurrentUserFilter())
-
-        hideNetworkError()
     }
 
     private fun getCurrentUserFilter(): String {
@@ -129,7 +122,6 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
             else -> "all"
         }
     }
-
 
     // ----------------------------------------------------------
     // ⚠️ Observar errores de red de ViewModels
@@ -141,8 +133,6 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
                 if (errorMessage != null) {
                     showNetworkError(errorMessage)
                     userViewModel.clearNetworkError()
-                } else {
-                    hideNetworkError()
                 }
             }
         }
@@ -151,21 +141,34 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
         adminConfigViewModel.saveStatus.observe(this) { message ->
             if (message.contains("Error de red", ignoreCase = true) || message.contains("IOException", ignoreCase = true)) {
                 showNetworkError(message)
-            } else if (!isNetworkErrorVisible()) {
-                if (message.contains("éxito")) {
-                    UiUtils.showSnackbar(binding.root, message, isError = false)
-                }
+            } else if (!message.contains("éxito", ignoreCase = true) && message.isNotEmpty()) {
+                // Mostrar otros errores que no sean de red como snackbar
+                UiUtils.showSnackbar(binding.root, message, isError = true)
+            } else if (message.contains("éxito", ignoreCase = true)) {
+                UiUtils.showSnackbar(binding.root, message, isError = false)
             }
         }
 
-        // Observar errores de carga inicial de AdminConfigViewModel (si falla al cargar)
+        // Observar errores de carga inicial de AdminConfigViewModel
         adminConfigViewModel.loadError.observe(this) { message ->
             if (message.contains("Error de red", ignoreCase = true) || message.contains("IOException", ignoreCase = true)) {
                 showNetworkError(message)
+            } else if (message.isNotEmpty()) {
+                UiUtils.showSnackbar(binding.root, message, isError = true)
+            }
+        }
+
+        // Observar errores de ProcesoViewModel
+        procesoViewModel.procesoStatus.observe(this) { message ->
+            if (message.contains("Error de red", ignoreCase = true) || message.contains("IOException", ignoreCase = true)) {
+                showNetworkError(message)
+            } else if (message.isNotEmpty() && !message.contains("Proceso activo", ignoreCase = true) &&
+                !message.contains("Proceso inactivo", ignoreCase = true)) {
+                // Mostrar otros errores del proceso como snackbar
+                UiUtils.showSnackbar(binding.root, message, isError = true)
             }
         }
     }
-
 
     // ----------------------------------------------------------
     // 🔄 Observar estados de carga (Loading)
@@ -190,10 +193,13 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
         }
 
         procesoViewModel.isLoading.observe(this) { isLoading ->
-            // Manejar loading específico del proceso si es necesario
+            if (isLoading) {
+                UiUtils.showLoading(this, "Procesando...")
+            } else {
+                UiUtils.hideLoading()
+            }
         }
     }
-
 
     // ----------------------------------------------------------
     // 💡 Inicialización de Managers, Voz y Waveform
@@ -204,20 +210,7 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
         val waveformSeekBar = waveFormSection.findViewById<WaveformSeekBar>(R.id.waveformSeekBar)
         val btnPlayMessage = waveFormSection.findViewById<MaterialButton>(R.id.btn_play_message)
 
-        // waveformManager y voiceManager son propiedades heredadas de BaseVoiceActivity
-        // Solo necesitamos inicializarlas aquí si BaseVoiceActivity no lo hace automáticamente
-        // o si necesitamos pasarles las vistas específicas.
-
-        // ASUMO que BaseVoiceActivity ya maneja voiceManager.initialize() y la configuración básica.
-        // Si no es el caso, esta inicialización debe estar en BaseVoiceActivity o BaseActivity.
-        // Para solucionar el error: re-usamos la propiedad heredada.
-
-        // waveformManager = WaveformManager(waveformSeekBar) // ❌ No se re-declara
-        // voiceManager = VoiceManager(this) { btnPlayMessage.isEnabled = true } // ❌ No se re-declara
-
-        // Para evitar el conflicto de re-declaración, aseguramos que la propiedad heredada
-        // (si existe) se configure con las vistas, o que se use el método setupWaveformComponents
-        // heredado de BaseVoiceActivity, que es lo correcto para las clases base que manejan vistas.
+        // Configurar componentes de voz heredados
         setupWaveformComponents(waveformSeekBar, btnPlayMessage)
 
         chartManager = AdminChartManager(this, graficasRepo, lifecycleScope)
@@ -230,10 +223,7 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
             lifecycleOwner = this
         )
 
-        // waveformManager.setupInitialSamples() // ❌ Usar la propiedad heredada
-        waveformManager.setupInitialSamples() // ✅ Correcto, si está configurado en setupWaveformComponents
-        // voiceManager.initialize() // ✅ Correcto, si está configurado en setupWaveformComponents
-
+        // Configurar listener del botón de reproducción
         btnPlayMessage.setOnClickListener {
             val message = "Bienvenido al panel del administrador. Aquí puedes gestionar usuarios, revisar las gráficas y acceder a las funciones de inteligencia artificial."
 
@@ -301,7 +291,6 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
         val tabLayout = binding.userAdminSection.tabLayoutUsuarios
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
-                hideNetworkError()
                 when (tab?.position) {
                     0 -> userViewModel.loadAllUsers(estado = "activo")
                     1 -> userViewModel.loadAllUsers(estado = "bloqueado")
@@ -332,15 +321,12 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
             userViewModel.updateUserEstado(user.id, nuevoEstado)
 
             val message = "Usuario ${user.nombre} ahora está $nuevoEstado"
-            if (!isNetworkErrorVisible()) {
-                UiUtils.showSnackbar(binding.root, message, isError = nuevoEstado == "bloqueado")
-            }
+            UiUtils.showSnackbar(binding.root, message, isError = nuevoEstado == "bloqueado")
 
             dialog.dismiss()
         }
         dialog.show()
     }
-
 
     // ----------------------------------------------------------
     // 📊 Lógica de Gráficas (Usando AdminChartManager)
@@ -363,7 +349,6 @@ class AdminDashboardActivity : BaseVoiceActivity(), NetworkRetryListener {
             chartManager.showGraphTypeDialog("Metano", binding.graficasAdminSection.graphContainerGas, binding.graficasAdminSection.btnChangeGas, 1)
         }
     }
-
 
     // ----------------------------------------------------------
     // 🧭 Lógica de Navegación (Corregida la Visibilidad)

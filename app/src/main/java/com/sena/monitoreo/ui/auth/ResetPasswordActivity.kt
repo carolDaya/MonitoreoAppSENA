@@ -3,7 +3,6 @@ package com.sena.monitoreo.ui.auth
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
@@ -19,15 +18,13 @@ import com.sena.monitoreo.data.repository.AuthRepository
 import com.sena.monitoreo.ui.auth.factory.AuthViewModelFactory
 import com.sena.monitoreo.ui.auth.viewmodel.password_reset.ResetPasswordViewModel
 import com.sena.monitoreo.ui.auth.viewmodel.password_reset.ResetPasswordUiState
-import com.sena.monitoreo.ui.base.BaseActivity // Importar BaseActivity
-import com.sena.monitoreo.utils.NetworkRetryListener // Importar la interfaz
+import com.sena.monitoreo.ui.base.BaseActivity
 import com.sena.monitoreo.utils.UiUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-// 💡 1. Heredar de BaseActivity e implementar NetworkRetryListener
-class ResetPasswordActivity : BaseActivity(), NetworkRetryListener {
+class ResetPasswordActivity : BaseActivity() {
 
     // Componentes de la UI
     private lateinit var inputNewPassword: TextInputEditText
@@ -52,14 +49,10 @@ class ResetPasswordActivity : BaseActivity(), NetworkRetryListener {
 
         containerView = findViewById(R.id.container_reset)
 
-        // 💡 2. Inicializar el manejo de errores de red (Método heredado)
-        setupNetworkErrorHandling(containerView as ViewGroup, this)
-
-        // 3. Obtener datos y ajustar insets
+        // Obtener datos y ajustar insets
         phoneNumber = intent.getStringExtra("PHONE_NUMBER") ?: ""
         if (phoneNumber.isEmpty()) {
             UiUtils.showSnackbar(containerView, "Error interno: número de teléfono no recibido", isError = true)
-            // finish()
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(containerView) { v, insets ->
@@ -73,20 +66,12 @@ class ResetPasswordActivity : BaseActivity(), NetworkRetryListener {
         observeUiState()
     }
 
-    // 💡 4. Implementación obligatoria del método de reintento (Heredado de BaseActivity)
     override fun onNetworkRetry() {
-        // La lógica de recarga en esta pantalla es reintentar la acción de actualizar la contraseña,
-        // solo si los campos están llenos y el botón estaba habilitado.
         val newPass = inputNewPassword.text.toString().trim()
         val confirmPass = inputConfirmPassword.text.toString().trim()
 
-        // Llamamos al ViewModel para que vuelva a validar y si es válido, reintente la llamada a la API
         if (newPass.isNotEmpty() && confirmPass.isNotEmpty()) {
             viewModel.updatePassword(phoneNumber, newPass, confirmPass)
-        } else {
-            // Si falta validación (aunque el botón debería estar deshabilitado)
-            UiUtils.showSnackbar(containerView, "Por favor, ingresa y confirma la nueva contraseña.", isError = true)
-            hideNetworkError()
         }
     }
 
@@ -104,25 +89,36 @@ class ResetPasswordActivity : BaseActivity(), NetworkRetryListener {
     private fun setupListeners() {
         // Lógica de habilitación del botón
         val watcher = {
-            clearInputErrors() // Limpiar errores al escribir
-            hideNetworkError() // Ocultar error de red al escribir
-
+            clearInputErrors()
             val newPass = inputNewPassword.text.toString().trim()
             val confirmPass = inputConfirmPassword.text.toString().trim()
-
             buttonSetPassword.isEnabled = newPass.isNotEmpty() && confirmPass.isNotEmpty()
         }
 
         inputNewPassword.addTextChangedListener { watcher() }
         inputConfirmPassword.addTextChangedListener { watcher() }
 
-        // Acción del botón
+        // Acción del botón - VALIDACIÓN LOCAL PRIMERO
         buttonSetPassword.setOnClickListener {
-            hideNetworkError() // Aseguramos que la vista de error se oculte antes del intento
             val newPass = inputNewPassword.text.toString().trim()
             val confirmPass = inputConfirmPassword.text.toString().trim()
 
-            viewModel.updatePassword(phoneNumber, newPass, confirmPass)
+            // ✅ VALIDACIÓN LOCAL SIMPLE
+            when {
+                newPass.isEmpty() || confirmPass.isEmpty() -> {
+                    UiUtils.showSnackbar(containerView, "Por favor, completa ambos campos", isError = true)
+                }
+                newPass.length < 6 -> {
+                    layoutNewPassword.error = "La contraseña debe tener al menos 6 caracteres"
+                }
+                newPass != confirmPass -> {
+                    layoutConfirmPassword.error = "Las contraseñas no coinciden"
+                }
+                else -> {
+                    // ✅ TODO VALIDADO - Llamar al ViewModel
+                    viewModel.updatePassword(phoneNumber, newPass, confirmPass)
+                }
+            }
         }
     }
 
@@ -133,7 +129,6 @@ class ResetPasswordActivity : BaseActivity(), NetworkRetryListener {
                     ResetPasswordUiState.Idle -> {
                         UiUtils.hideLoading()
                         clearInputErrors()
-                        hideNetworkError() // Ocultar si está en Idle
                     }
                     ResetPasswordUiState.Loading -> {
                         UiUtils.showLoading(this@ResetPasswordActivity, "Actualizando contraseña...")
@@ -141,9 +136,7 @@ class ResetPasswordActivity : BaseActivity(), NetworkRetryListener {
                     }
                     is ResetPasswordUiState.Success -> {
                         UiUtils.hideLoading()
-                        hideNetworkError() // Ocultar si la conexión fue exitosa
                         UiUtils.showSnackbar(containerView, "Contraseña actualizada correctamente")
-
                         delay(1200)
                         UiUtils.navigateTo(this@ResetPasswordActivity, LoginActivity::class.java, true)
                     }
@@ -151,28 +144,16 @@ class ResetPasswordActivity : BaseActivity(), NetworkRetryListener {
                         UiUtils.hideLoading()
                         val errorMessage = state.message
 
-                        // 💡 CLAVE 5: Manejo de error UNIFICADO
-                        if (errorMessage.contains("Error de red", ignoreCase = true) || errorMessage.contains("IOException", ignoreCase = true)) {
-                            // 1. Error de red: Muestra la pantalla de error de red (Método heredado)
+                        // Solo manejar errores de red aquí
+                        if (errorMessage.contains("Error de red", ignoreCase = true) ||
+                            errorMessage.contains("IOException", ignoreCase = true)) {
                             showNetworkError(errorMessage)
                         } else {
-                            // 2. Errores de validación/servidor
-                            clearInputErrors() // Limpiar errores previos
-
-                            if (errorMessage.contains("Debe tener al menos 6 caracteres", ignoreCase = true)) {
-                                // Error de validación: Longitud de contraseña
-                                layoutNewPassword.error = errorMessage
-                            } else if (errorMessage.contains("Las contraseñas no coinciden", ignoreCase = true)) {
-                                // Error de validación: No coinciden
-                                layoutConfirmPassword.error = errorMessage
-                            } else {
-                                // Error de servidor/negocio: Mostrar en Snackbar
-                                UiUtils.showSnackbar(containerView, errorMessage, isError = true)
-                            }
+                            // Otros errores del servidor
+                            UiUtils.showSnackbar(containerView, errorMessage, isError = true)
                         }
                     }
-                    // ❌ Eliminado: Ya no se maneja el estado ValidationError
-                    // is ResetPasswordUiState.ValidationError -> {}
+
                     is ResetPasswordUiState.ValidationError -> TODO()
                 }
             }

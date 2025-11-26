@@ -19,4 +19,5 @@ sealed class ApiException(message: String) : Exception(message) {
      * Usada para cualquier otra excepción no cubierta (ej. error de parsing JSON).
      */
     class UnknownError(message: String = "Ocurrió un error inesperado del sistema") : ApiException(message)
+    class TimeoutError(message: String) : ApiException(message)
 }

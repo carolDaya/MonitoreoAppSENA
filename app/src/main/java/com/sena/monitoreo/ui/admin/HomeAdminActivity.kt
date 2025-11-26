@@ -3,7 +3,6 @@ package com.sena.monitoreo.ui.admin
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.GravityCompat
 import androidx.lifecycle.ViewModelProvider
@@ -18,14 +17,13 @@ import com.sena.monitoreo.ui.admin.factory.ProcesoViewModelFactory
 import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
 import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
 import com.sena.monitoreo.ui.base.BaseVoiceActivity
-import com.sena.monitoreo.utils.NetworkRetryListener
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.navigation.NavigationManager
 import com.sena.monitoreo.utils.proceso.ProcesoManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
+class HomeAdminActivity : BaseVoiceActivity() {
 
     private lateinit var binding: ActivityHomeAdminBinding
     private lateinit var navigationManager: NavigationManager
@@ -49,14 +47,13 @@ class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
         binding = ActivityHomeAdminBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Configurar manejo de errores de red
-        setupNetworkErrorHandling(binding.root as ViewGroup, this)
+        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         setupNavigation()
         setupVoiceConfiguration()
         setupProcesoControl()
 
-        // 💡 CORRECCIÓN: Cargar estado del proceso al iniciar
+        // Cargar estado del proceso al iniciar
         lifecycleScope.launch {
             procesoViewModel.loadProcesoStatus()
         }
@@ -98,7 +95,7 @@ class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
 
         voiceConfigViewModel.loadCurrentConfig()
 
-        // 💡 CORRECCIÓN: Observar VoiceConfigViewModel simplificado
+        // Observar configuración de voz
         lifecycleScope.launch {
             voiceConfigViewModel.currentConfig.collectLatest { config ->
                 voiceManager.currentPitch = config.voicePitch.toFloat()
@@ -110,7 +107,7 @@ class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
             }
         }
 
-        // 💡 CORRECCIÓN: Manejo de errores de voz simplificado
+        // Manejo de errores de voz
         lifecycleScope.launch {
             voiceConfigViewModel.uiState.collectLatest { state ->
                 when (state) {
@@ -118,12 +115,13 @@ class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
                         if (state.message.contains("Error de red", ignoreCase = true) ||
                             state.message.contains("IOException", ignoreCase = true)) {
                             showNetworkError(state.message)
+                        } else {
+                            // Mostrar otros errores como snackbar
+                            UiUtils.showSnackbar(binding.root, state.message, isError = true)
                         }
                     }
                     VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        if (isNetworkErrorVisible()) {
-                            hideNetworkError()
-                        }
+                        // Éxito en la carga - no necesita acción específica
                     }
                     else -> {}
                 }
@@ -143,8 +141,9 @@ class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
             progressBar = cardBinding.procesoProgressBar,
             lifecycleOwner = this,
             onStatusUpdate = { message ->
-                // Solo mostrar Snackbar y hablar si no hay error de red
-                if (!isNetworkErrorVisible()) {
+                // Solo mostrar Snackbar y hablar si no es un error de red
+                if (!message.contains("Error de red", ignoreCase = true) &&
+                    !message.contains("IOException", ignoreCase = true)) {
                     UiUtils.showSnackbar(binding.root, message)
                     speakWithWaveform(message)
                 }
@@ -153,17 +152,26 @@ class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
 
         procesoManager.setupProcesoControl()
 
-        // 💡 CORRECCIÓN: Observar el estado del proceso para manejar errores de red
+        // Observar el estado del proceso para manejar errores de red
         procesoViewModel.procesoStatus.observe(this) { mensaje ->
             if (mensaje.contains("Error de red", ignoreCase = true) ||
                 mensaje.contains("IOException", ignoreCase = true)) {
                 showNetworkError(mensaje)
-            } else if (mensaje.contains("correctamente", ignoreCase = true) ||
-                mensaje.contains("cargado", ignoreCase = true)) {
-                // Ocultar error si la operación fue exitosa
-                if (isNetworkErrorVisible()) {
-                    hideNetworkError()
-                }
+            } else if (mensaje.isNotEmpty() &&
+                !mensaje.contains("Proceso activo", ignoreCase = true) &&
+                !mensaje.contains("Proceso inactivo", ignoreCase = true)) {
+                // Mostrar otros mensajes del proceso como snackbar
+                UiUtils.showSnackbar(binding.root, mensaje,
+                    isError = mensaje.contains("Error", ignoreCase = true))
+            }
+        }
+
+        // Observar errores de red específicos del proceso
+        procesoViewModel.isLoading.observe(this) { isLoading ->
+            if (isLoading) {
+                UiUtils.showLoading(this, "Procesando...")
+            } else {
+                UiUtils.hideLoading()
             }
         }
     }
@@ -187,9 +195,7 @@ class HomeAdminActivity : BaseVoiceActivity(), NetworkRetryListener {
         }
 
         // Solo iniciar speaking si no hay error de red
-        if (!isNetworkErrorVisible()) {
-            startSpeaking()
-        }
+        startSpeaking()
     }
 
     override fun startSpeaking() {
