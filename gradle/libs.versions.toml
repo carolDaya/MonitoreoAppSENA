@@ -20,6 +20,7 @@ waveformseekbar = "5.0.2"
 amplituda = "2.2.2"
 spinkit = "1.4.0"
 kotlinxCoroutines = "1.8.0"
+glance = "1.1.1"
 [libraries]
 # Define la librería Core
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
@@ -63,6 +64,7 @@ waveform = { module = "com.github.massoudss:waveformSeekBar", version.ref = "wav
 amplituda = { module = "com.github.lincollincol:amplituda", version.ref = "amplituda" }
 
 ybq-spinkit = { module = "com.github.ybq:Android-SpinKit", version.ref = "spinkit" }
+androidx-glance = { group = "androidx.glance", name = "glance", version.ref = "glance" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

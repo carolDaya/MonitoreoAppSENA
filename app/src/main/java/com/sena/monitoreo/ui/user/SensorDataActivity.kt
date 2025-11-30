@@ -26,6 +26,8 @@ import com.sena.monitoreo.utils.charts.ChartManager
 import com.sena.monitoreo.utils.navigation.NavigationManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 class SensorDataActivity : BaseVoiceActivity() {
 
@@ -62,8 +64,6 @@ class SensorDataActivity : BaseVoiceActivity() {
         enableEdgeToEdge()
         binding = ActivitySensorDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         initializeManagers()
         setupNavigation()
@@ -118,10 +118,9 @@ class SensorDataActivity : BaseVoiceActivity() {
         when (cardType.uppercase()) {
             "GAS" -> {
                 binding.mainScroll.post {
-                    // 💡 CORRECCIÓN: Scroll directo al card específico
                     val cardView = binding.cardMq4.root
                     val top = cardView.top
-                    binding.mainScroll.smoothScrollTo(0, top - 150) // Offset para mejor visualización
+                    binding.mainScroll.smoothScrollTo(0, top - 150)
                     UiUtils.showSnackbar(binding.root, "Desplazando a Gas Metano", false)
                 }
             }
@@ -147,10 +146,7 @@ class SensorDataActivity : BaseVoiceActivity() {
     override fun onNetworkRetry() {
         Log.d(TAG, "🔄 Reintentando carga completa...")
         lifecycleScope.launch {
-            // Mostrar mensaje de intento
             UiUtils.showSnackbar(binding.root, "Reconectando...", false)
-
-            // Recargar configuraciones y estado del proceso
             loadConfiguraciones()
             procesoViewModel.loadProcesoStatus()
         }
@@ -169,7 +165,6 @@ class SensorDataActivity : BaseVoiceActivity() {
             },
             onError = { errorMessage ->
                 runOnUiThread {
-                    // Solo mostrar snackbar si no es un error de red
                     if (!errorMessage.contains("Error de red", ignoreCase = true) &&
                         !errorMessage.contains("IOException", ignoreCase = true)) {
                         UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
@@ -222,7 +217,6 @@ class SensorDataActivity : BaseVoiceActivity() {
                 when (state) {
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
                         Log.e(TAG, "❌ Error configuración voz: ${state.message}")
-                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
                         if (state.message.contains("Error de red", ignoreCase = true) ||
                             state.message.contains("IOException", ignoreCase = true)) {
                             showNetworkError("Error de voz: ${state.message}")
@@ -262,9 +256,26 @@ class SensorDataActivity : BaseVoiceActivity() {
         lifecycleScope.launch {
             delay(5000)
 
+            var errorCount = 0
+            val maxErrorCount = 3
+
             while (true) {
-                Log.d(TAG, "🕒 Refresh automático - Solicitando estado del proceso")
-                procesoViewModel.loadProcesoStatus()
+                try {
+                    Log.d(TAG, "🕒 Refresh automático - Solicitando estado del proceso")
+                    procesoViewModel.loadProcesoStatus()
+                    errorCount = 0 // Reset error count on success
+                } catch (e: Exception) {
+                    errorCount++
+                    Log.e(TAG, "❌ Error en refresh #$errorCount: ${e.message}")
+
+                    // Backoff exponencial en caso de errores consecutivos
+                    if (errorCount >= maxErrorCount) {
+                        val backoffTime = refreshTime * errorCount
+                        Log.w(TAG, "⚠️ Muchos errores, aplicando backoff: ${backoffTime}ms")
+                        UiUtils.showSnackbar(binding.root, "Problemas de conexión - Reintentando...", false)
+                        delay(backoffTime)
+                    }
+                }
                 delay(refreshTime)
             }
         }
@@ -278,7 +289,7 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         when (val result = graficasRepo.getGraficas()) {
             is ResultWrapper.Success -> {
-                cachedConfiguraciones = result.data
+                cachedConfiguraciones = result.data // ✅ CORREGIDO: usar .data según tu ResultWrapper
                 Log.d(TAG, "✅ Configuraciones cargadas: ${result.data.size}")
 
                 if (isFirstLoad) {
@@ -290,9 +301,8 @@ class SensorDataActivity : BaseVoiceActivity() {
                 cachedConfiguraciones = null
                 val errorMsg = "Error configuraciones: ${result.message}"
                 Log.e(TAG, "❌ Error configuraciones: ${result.message}")
-                // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
-                if (result.message?.contains("Error de red", ignoreCase = true) == true ||
-                    result.message?.contains("IOException", ignoreCase = true) == true) {
+                if (result.message.contains("Error de red", ignoreCase = true) ||
+                    result.message.contains("IOException", ignoreCase = true)) {
                     showNetworkError(errorMsg)
                 } else {
                     UiUtils.showSnackbar(binding.root, errorMsg, true)
@@ -323,7 +333,6 @@ class SensorDataActivity : BaseVoiceActivity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error general en carga sensores: ${e.message}", e)
-            // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
             if (e.message?.contains("Error de red", ignoreCase = true) == true ||
                 e.message?.contains("IOException", ignoreCase = true) == true) {
                 showNetworkError("Error: ${e.message}")
@@ -352,40 +361,69 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         Log.d(TAG, "📡 Cargando: $nombreSensor (Proceso activo: $hayProcesoActivo)")
 
-        val lecturaResult = if (hayProcesoActivo) {
-            lecturaRepo.getLecturas(sensorId)
-        } else {
-            ResultWrapper.Success(emptyList())
+        // ✅ CORREGIDO: Mostrar estado de carga solo después de un breve delay
+        var loadingShown = false
+        val loadingJob = lifecycleScope.launch {
+            delay(1500) // Esperar 1.5 segundos antes de mostrar loading
+            if (!loadingShown) {
+                runOnUiThread {
+                    showLoadingState(cardView, nombreSensor, "🔄 Conectando con el sensor...")
+                }
+            }
         }
 
-        when (lecturaResult) {
-            is ResultWrapper.Success -> {
-                val lecturas = lecturaResult.data
-                runOnUiThread {
-                    if (lecturas.isNotEmpty()) {
-                        Log.d(TAG, "✅ $nombreSensor: ${lecturas.size} lecturas")
-                        val entries = lecturas.mapIndexed { index, lectura ->
-                            Entry(index.toFloat(), lectura.valor.toFloat())
+        try {
+            val lecturaResult = if (hayProcesoActivo) {
+                // ✅ CORREGIDO: Agregar timeout a la llamada de red
+                withTimeout(10000) { // 10 segundos timeout
+                    lecturaRepo.getLecturas(sensorId)
+                }
+            } else {
+                ResultWrapper.Success(emptyList())
+            }
+
+            loadingShown = true
+            loadingJob.cancel()
+
+            when (lecturaResult) {
+                is ResultWrapper.Success -> {
+                    val lecturas = lecturaResult.data // ✅ CORREGIDO: usar .data según tu ResultWrapper
+                    runOnUiThread {
+                        if (lecturas.isNotEmpty()) {
+                            Log.d(TAG, "✅ $nombreSensor: ${lecturas.size} lecturas")
+                            val entries = lecturas.mapIndexed { index, lectura ->
+                                // ✅ CORREGIDO: usar lectura.valor según tu LecturaResponse
+                                Entry(index.toFloat(), lectura.valor.toFloat())
+                            }
+                            chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
+                        } else {
+                            Log.w(TAG, "📭 $nombreSensor: Sin lecturas (Proceso activo: $hayProcesoActivo)")
+                            showNoDataChart(cardView, nombreSensor, hayProcesoActivo)
                         }
-                        chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
-                    } else {
-                        Log.w(TAG, "📭 $nombreSensor: Sin lecturas (Proceso activo: $hayProcesoActivo)")
-                        showNoDataChart(cardView, nombreSensor, hayProcesoActivo)
+                    }
+                }
+                is ResultWrapper.Error -> {
+                    Log.e(TAG, "❌ Error $nombreSensor: ${lecturaResult.message}")
+                    runOnUiThread {
+                        showNoDataChart(cardView, nombreSensor, hayProcesoActivo,
+                            "🌐 Intentando reconectar...")
+
+                        if (lecturaResult.message.contains("Error de red", ignoreCase = true) ||
+                            lecturaResult.message.contains("IOException", ignoreCase = true) ||
+                            lecturaResult.message.contains("Timeout", ignoreCase = true)) {
+                            showNetworkError("Error de conexión: ${lecturaResult.message}")
+                        }
                     }
                 }
             }
-            is ResultWrapper.Error -> {
-                Log.e(TAG, "❌ Error $nombreSensor: ${lecturaResult.message}")
-                runOnUiThread {
-                    showNoDataChart(cardView, nombreSensor, hayProcesoActivo,
-                        "❌ Error: ${lecturaResult.message}")
-
-                    // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
-                    if (lecturaResult.message?.contains("Error de red", ignoreCase = true) == true ||
-                        lecturaResult.message?.contains("IOException", ignoreCase = true) == true) {
-                        showNetworkError("Error de conexión: ${lecturaResult.message}")
-                    }
-                }
+        } catch (e: TimeoutCancellationException) {
+            loadingShown = true
+            loadingJob.cancel()
+            Log.e(TAG, "⏰ Timeout en $nombreSensor: ${e.message}")
+            runOnUiThread {
+                showNoDataChart(cardView, nombreSensor, hayProcesoActivo,
+                    "⏰ Timeout - Reintentando...")
+                UiUtils.showSnackbar(binding.root, "El sensor $nombreSensor está tardando en responder", false)
             }
         }
     }
@@ -402,18 +440,73 @@ class SensorDataActivity : BaseVoiceActivity() {
         }
     }
 
+    // ✅ NUEVO MÉTODO: Mostrar estado de carga con feedback visual
+    private fun showLoadingState(cardView: android.view.View, sensorName: String, message: String) {
+        try {
+            val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
+            titleTextView?.text = "$sensorName 🔄"
+
+            // Ocultar gráficas
+            cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
+            cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
+            cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
+
+            val chartContainer = cardView.findViewById<android.view.ViewGroup>(R.id.chart_container)
+            chartContainer?.removeAllViews()
+
+            // Mostrar progreso con animación
+            android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, 50, 0, 0)
+
+                // TextView con mensaje
+                android.widget.TextView(context).apply {
+                    text = message
+                    textSize = 14f
+                    setTextColor(android.graphics.Color.parseColor("#FFA500")) // Color naranja
+                    gravity = android.view.Gravity.CENTER
+                }.also { addView(it) }
+
+                // Progress Bar
+                android.widget.ProgressBar(context).apply {
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = 16
+                    }
+                    isIndeterminate = true
+                }.also { addView(it) }
+            }.also { chartContainer?.addView(it) }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mostrando estado de carga: ${e.message}")
+        }
+    }
+
     private fun showNoDataChart(cardView: android.view.View, sensorName: String,
                                 hayProcesoActivo: Boolean, customMessage: String? = null) {
         try {
             val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
-            titleTextView?.text = sensorName
 
+            // Iconos diferentes según el estado
+            val statusIcon = when {
+                customMessage?.contains("Error", ignoreCase = true) == true -> "❌"
+                customMessage?.contains("Timeout", ignoreCase = true) == true -> "⏰"
+                hayProcesoActivo -> "📡"
+                else -> "⏸️"
+            }
+
+            titleTextView?.text = "$sensorName $statusIcon"
+
+            // Ocultar gráficas existentes
             cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
             cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
             cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
 
             val mensaje = customMessage ?: if (hayProcesoActivo) {
-                "⏳ Esperando datos del sensor..."
+                "Esperando datos..."
             } else {
                 "⏸️ Proceso inactivo"
             }
@@ -424,7 +517,13 @@ class SensorDataActivity : BaseVoiceActivity() {
             android.widget.TextView(this).apply {
                 text = mensaje
                 textSize = 14f
-                setTextColor(android.graphics.Color.GRAY)
+                // Colores según el estado
+                setTextColor(when {
+                    mensaje.contains("✅") -> android.graphics.Color.parseColor("#4CAF50")
+                    mensaje.contains("❌") -> android.graphics.Color.parseColor("#F44336")
+                    mensaje.contains("⏰") -> android.graphics.Color.parseColor("#FF9800")
+                    else -> android.graphics.Color.GRAY
+                })
                 gravity = android.view.Gravity.CENTER
                 setPadding(0, 50, 0, 0)
             }.also { chartContainer?.addView(it) }
@@ -446,16 +545,15 @@ class SensorDataActivity : BaseVoiceActivity() {
         lifecycleScope.launch {
             when (val analisisResult = analisisRepo.analizarLectura()) {
                 is ResultWrapper.Success -> {
-                    val fullMessage = formatAnalysisMessage(analisisResult.data)
+                    val fullMessage = formatAnalysisMessage(analisisResult.data) // ✅ CORREGIDO: usar .data
                     speakWithPausesAndWaveform(fullMessage, 1000L)
                 }
                 is ResultWrapper.Error -> {
                     UiUtils.showSnackbar(binding.root, "Error en análisis: ${analisisResult.message}", true)
                     stopSpeaking()
 
-                    // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
-                    if (analisisResult.message?.contains("Error de red", ignoreCase = true) == true ||
-                        analisisResult.message?.contains("IOException", ignoreCase = true) == true) {
+                    if (analisisResult.message.contains("Error de red", ignoreCase = true) ||
+                        analisisResult.message.contains("IOException", ignoreCase = true)) {
                         showNetworkError("Error de conexión en análisis: ${analisisResult.message}")
                     }
                 }
