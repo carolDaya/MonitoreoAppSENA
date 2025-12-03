@@ -31,7 +31,7 @@
         android:layout_marginStart="@dimen/spacing_small"
         android:layout_marginTop="@dimen/spacing_large"
         android:contentDescription="@string/desc_icon_settings"
-        android:src="@drawable/ic_settings_white"
+        android:src="@drawable/ic_menu"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
