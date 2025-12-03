@@ -21,6 +21,7 @@ import com.sena.monitoreo.ui.base.factory.VoiceConfigViewModelFactory
 import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
 import com.sena.monitoreo.utils.ResultWrapper
 import com.sena.monitoreo.utils.UiUtils
+import com.sena.monitoreo.utils.cache.*
 import com.sena.monitoreo.utils.alerts.AlertManager
 import com.sena.monitoreo.utils.charts.ChartManager
 import com.sena.monitoreo.utils.navigation.NavigationManager
@@ -56,7 +57,18 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     private val refreshTime = 30 * 1000L // 30 segundos
-    private var cachedConfiguraciones: List<GraficaResponse>? = null
+
+    companion object {
+        private var cachedConfiguraciones: List<GraficaResponse>? = null
+        private var lastConfigLoadTime: Long = 0
+        private const val CONFIG_CACHE_DURATION = 5 * 60 * 1000L // 5 minutos
+
+        fun clearCache() {
+            cachedConfiguraciones = null
+            lastConfigLoadTime = 0
+        }
+    }
+
     private var isFirstLoad = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,37 +81,59 @@ class SensorDataActivity : BaseVoiceActivity() {
         setupNavigation()
         setupVoiceConfiguration()
         setupAlertTestButton()
-
-        // Manejar navegación desde el menú
         handleIntentNavigation()
 
-        // CARGAR CONFIGURACIONES UNA SOLA VEZ AL INICIO
+        // ✅ MEJORADO: Carga inteligente con caché
         lifecycleScope.launch {
-            loadConfiguraciones()
-        }
+            Log.d(TAG, "🔄 Iniciando carga inicial...")
 
-        // Observar estado del proceso
-        procesoViewModel.isProcesoActivo.observe(this) { activo ->
-            if (activo != null) {
-                Log.d(TAG, "📊 Estado del proceso OBSERVADO: $activo")
-                lifecycleScope.launch {
-                    loadSensorsAndCharts(activo)
-                }
+            // Verificar si las configuraciones en caché son válidas
+            val configCacheAge = System.currentTimeMillis() - lastConfigLoadTime
+            val needsConfigReload = cachedConfiguraciones == null || configCacheAge > CONFIG_CACHE_DURATION
+
+            if (needsConfigReload) {
+                Log.d(TAG, "📥 Cargando configuraciones desde servidor...")
+                loadConfiguraciones()
+            } else {
+                Log.d(TAG, "⚡ Usando configuraciones cacheadas (edad: ${configCacheAge}ms)")
+            }
+
+            // Cargar estado del proceso
+            Log.d(TAG, "🔄 Cargando estado del proceso...")
+            procesoViewModel.loadProcesoStatus()
+
+            // Esperar un poco para la red
+            delay(1500)
+
+            // Obtener estado (usar true por defecto si es null)
+            val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
+            Log.d(TAG, "📊 Estado del proceso: $estadoProceso")
+
+            // Cargar sensores
+            if (cachedConfiguraciones != null) {
+                Log.d(TAG, "✅ Cargando sensores con configuraciones")
+                loadSensorsAndCharts(estadoProceso)
+            } else {
+                Log.w(TAG, "⚠️ Sin configuraciones - mostrando defaults")
+                showDefaultCharts(estadoProceso)
             }
         }
 
-        // Cargar estado inicial del proceso
-        lifecycleScope.launch {
-            Log.d(TAG, "🔄 Cargando estado inicial del proceso...")
-            procesoViewModel.loadProcesoStatus()
+        // Observer para actualizaciones posteriores
+        procesoViewModel.isProcesoActivo.observe(this) { activo ->
+            if (activo != null && !isFirstLoad) {
+                Log.d(TAG, "🔄 Actualización de estado detectada: $activo")
+                lifecycleScope.launch {
+                    if (cachedConfiguraciones != null) {
+                        loadSensorsAndCharts(activo)
+                    }
+                }
+            }
         }
 
         startChartRefreshLoop()
     }
 
-    /**
-     * Manejar navegación desde intent (scroll a cards específicas)
-     */
     private fun handleIntentNavigation() {
         intent.getStringExtra("SENSOR_TYPE")?.let { sensorType ->
             lifecycleScope.launch {
@@ -281,35 +315,40 @@ class SensorDataActivity : BaseVoiceActivity() {
         }
     }
 
-    /**
-     * Carga las configuraciones UNA SOLA VEZ al inicio
-     */
     private suspend fun loadConfiguraciones() {
         Log.d(TAG, "⚙️ Cargando configuraciones de gráficas...")
 
         when (val result = graficasRepo.getGraficas()) {
             is ResultWrapper.Success -> {
-                cachedConfiguraciones = result.data // ✅ CORREGIDO: usar .data según tu ResultWrapper
-                Log.d(TAG, "✅ Configuraciones cargadas: ${result.data.size}")
+                cachedConfiguraciones = result.data
+                lastConfigLoadTime = System.currentTimeMillis() // ✅ Marcar timestamp
+                Log.d(TAG, "✅ Configuraciones cargadas y cacheadas: ${result.data.size}")
 
-                if (isFirstLoad) {
-                    isFirstLoad = false
-                    procesoViewModel.loadProcesoStatus()
+                result.data.forEach { config ->
+                    Log.d(TAG, "📋 Config - SensorID: ${config.sensor_id}, Tipo: ${config.tipo_grafica}")
                 }
+
+                isFirstLoad = false
             }
             is ResultWrapper.Error -> {
-                cachedConfiguraciones = null
                 val errorMsg = "Error configuraciones: ${result.message}"
-                Log.e(TAG, "❌ Error configuraciones: ${result.message}")
-                if (result.message.contains("Error de red", ignoreCase = true) ||
-                    result.message.contains("IOException", ignoreCase = true)) {
-                    showNetworkError(errorMsg)
+                Log.e(TAG, "❌ $errorMsg")
+
+                // ✅ Si hay configuraciones en caché antiguas, usarlas
+                if (cachedConfiguraciones != null) {
+                    Log.w(TAG, "⚠️ Error de red, pero usando configuraciones en caché")
                 } else {
-                    UiUtils.showSnackbar(binding.root, errorMsg, true)
+                    if (result.message.contains("Error de red", ignoreCase = true) ||
+                        result.message.contains("IOException", ignoreCase = true)) {
+                        showNetworkError(errorMsg)
+                    } else {
+                        UiUtils.showSnackbar(binding.root, errorMsg, true)
+                    }
                 }
             }
         }
     }
+
 
     private suspend fun loadSensorsAndCharts(hayProcesoActivo: Boolean) {
         val configuraciones = cachedConfiguraciones ?: run {
@@ -322,15 +361,25 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         Log.d(TAG, "🚀 Cargando ${configuraciones.size} sensores. Proceso activo: $hayProcesoActivo")
 
-        if (!hayProcesoActivo || isFirstLoad) {
+        // ✅ NO mostrar loading si hay datos en caché
+        val hayCacheDatos = configuraciones.any { config ->
+            SensorCache.isFresh(config.sensor_id)
+        }
+
+        if (!hayCacheDatos && hayProcesoActivo) {
+            Log.d(TAG, "📊 No hay caché fresco - mostrando loading")
             UiUtils.showLoading(this, "Actualizando datos...")
+        } else {
+            Log.d(TAG, "⚡ Hay caché disponible - carga rápida sin loading")
         }
 
         try {
             for (config in configuraciones) {
+                Log.d(TAG, "🔄 Procesando sensor ${config.sensor_id}...")
                 loadSensorData(config, hayProcesoActivo)
-                delay(300)
+                delay(100) // ✅ Reducido a 100ms para carga más rápida
             }
+            Log.d(TAG, "✅ Todos los sensores procesados")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error general en carga sensores: ${e.message}", e)
             if (e.message?.contains("Error de red", ignoreCase = true) == true ||
@@ -359,45 +408,65 @@ class SensorDataActivity : BaseVoiceActivity() {
             }
         }
 
-        Log.d(TAG, "📡 Cargando: $nombreSensor (Proceso activo: $hayProcesoActivo)")
-
-        // ✅ CORREGIDO: Mostrar estado de carga solo después de un breve delay
-        var loadingShown = false
-        val loadingJob = lifecycleScope.launch {
-            delay(1500) // Esperar 1.5 segundos antes de mostrar loading
-            if (!loadingShown) {
-                runOnUiThread {
-                    showLoadingState(cardView, nombreSensor, "🔄 Conectando con el sensor...")
+        // ✅ PRIMERO: Intentar cargar desde caché (SIEMPRE)
+        val cachedLecturas = SensorCache.get(sensorId)
+        if (cachedLecturas != null) {
+            Log.d(TAG, "⚡ CARGA INSTANTÁNEA desde caché: $nombreSensor (${cachedLecturas.size} lecturas)")
+            runOnUiThread {
+                try {
+                    val entries = cachedLecturas.mapIndexed { index, lectura ->
+                        Entry(index.toFloat(), lectura.valor.toFloat())
+                    }
+                    chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ ERROR dibujando desde caché: ${e.message}", e)
                 }
             }
+
+            // ✅ Si el proceso está activo, actualizar en background SIN bloquear UI
+            if (hayProcesoActivo) {
+                lifecycleScope.launch {
+                    delay(500) // Pequeño delay para no saturar
+                    refreshSensorDataInBackground(sensorId, config, hayProcesoActivo)
+                }
+            }
+            return
         }
 
-        try {
-            val lecturaResult = if (hayProcesoActivo) {
-                // ✅ CORREGIDO: Agregar timeout a la llamada de red
-                withTimeout(10000) { // 10 segundos timeout
-                    lecturaRepo.getLecturas(sensorId)
-                }
-            } else {
-                ResultWrapper.Success(emptyList())
+        // ✅ SEGUNDO: Si no hay caché, cargar desde red (solo si proceso activo)
+        if (!hayProcesoActivo) {
+            runOnUiThread {
+                showNoDataChart(cardView, nombreSensor, false)
             }
+            return
+        }
 
-            loadingShown = true
-            loadingJob.cancel()
+        Log.d(TAG, "📡 Cargando desde red: $nombreSensor")
+
+        try {
+            val lecturaResult = withTimeout(15000) {
+                lecturaRepo.getLecturas(sensorId)
+            }
 
             when (lecturaResult) {
                 is ResultWrapper.Success -> {
-                    val lecturas = lecturaResult.data // ✅ CORREGIDO: usar .data según tu ResultWrapper
-                    runOnUiThread {
-                        if (lecturas.isNotEmpty()) {
-                            Log.d(TAG, "✅ $nombreSensor: ${lecturas.size} lecturas")
-                            val entries = lecturas.mapIndexed { index, lectura ->
-                                // ✅ CORREGIDO: usar lectura.valor según tu LecturaResponse
-                                Entry(index.toFloat(), lectura.valor.toFloat())
+                    val lecturas = lecturaResult.data
+
+                    if (lecturas.isNotEmpty()) {
+                        SensorCache.put(sensorId, lecturas)
+
+                        runOnUiThread {
+                            try {
+                                val entries = lecturas.mapIndexed { index, lectura ->
+                                    Entry(index.toFloat(), lectura.valor.toFloat())
+                                }
+                                chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "❌ ERROR renderizando: ${e.message}", e)
                             }
-                            chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
-                        } else {
-                            Log.w(TAG, "📭 $nombreSensor: Sin lecturas (Proceso activo: $hayProcesoActivo)")
+                        }
+                    } else {
+                        runOnUiThread {
                             showNoDataChart(cardView, nombreSensor, hayProcesoActivo)
                         }
                     }
@@ -405,26 +474,36 @@ class SensorDataActivity : BaseVoiceActivity() {
                 is ResultWrapper.Error -> {
                     Log.e(TAG, "❌ Error $nombreSensor: ${lecturaResult.message}")
                     runOnUiThread {
-                        showNoDataChart(cardView, nombreSensor, hayProcesoActivo,
-                            "🌐 Intentando reconectar...")
-
-                        if (lecturaResult.message.contains("Error de red", ignoreCase = true) ||
-                            lecturaResult.message.contains("IOException", ignoreCase = true) ||
-                            lecturaResult.message.contains("Timeout", ignoreCase = true)) {
-                            showNetworkError("Error de conexión: ${lecturaResult.message}")
-                        }
+                        showNoDataChart(cardView, nombreSensor, hayProcesoActivo, "🌐 Error de conexión")
                     }
                 }
             }
         } catch (e: TimeoutCancellationException) {
-            loadingShown = true
-            loadingJob.cancel()
-            Log.e(TAG, "⏰ Timeout en $nombreSensor: ${e.message}")
+            Log.e(TAG, "⏰ Timeout en $nombreSensor")
             runOnUiThread {
-                showNoDataChart(cardView, nombreSensor, hayProcesoActivo,
-                    "⏰ Timeout - Reintentando...")
-                UiUtils.showSnackbar(binding.root, "El sensor $nombreSensor está tardando en responder", false)
+                showNoDataChart(cardView, nombreSensor, hayProcesoActivo, "⏰ Timeout")
             }
+        }
+    }
+
+
+    private suspend fun refreshSensorDataInBackground(
+        sensorId: Int,
+        config: GraficaResponse,
+        hayProcesoActivo: Boolean
+    ) {
+        if (!hayProcesoActivo) return
+
+        try {
+            withTimeout(15000) {
+                val result = lecturaRepo.getLecturas(sensorId)
+                if (result is ResultWrapper.Success && result.data.isNotEmpty()) {
+                    SensorCache.put(sensorId, result.data)
+                    Log.d(TAG, "🔄 Cache actualizado en background: sensor $sensorId")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Error actualizando cache background: ${e.message}")
         }
     }
 
@@ -440,45 +519,51 @@ class SensorDataActivity : BaseVoiceActivity() {
         }
     }
 
-    // ✅ NUEVO MÉTODO: Mostrar estado de carga con feedback visual
     private fun showLoadingState(cardView: android.view.View, sensorName: String, message: String) {
         try {
             val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
             titleTextView?.text = "$sensorName 🔄"
 
-            // Ocultar gráficas
-            cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
-            cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
-            cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
+            // ✅ NO ELIMINAR - Solo ocultar los charts
+            val lineChart = cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)
+            val barChart = cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)
+            val pieChart = cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)
+
+            lineChart?.visibility = android.view.View.GONE
+            barChart?.visibility = android.view.View.GONE
+            pieChart?.visibility = android.view.View.GONE
 
             val chartContainer = cardView.findViewById<android.view.ViewGroup>(R.id.chart_container)
-            chartContainer?.removeAllViews()
 
-            // Mostrar progreso con animación
-            android.widget.LinearLayout(this).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, 50, 0, 0)
+            // ✅ Buscar si ya existe un loading view
+            val existingLoading = chartContainer?.findViewWithTag<android.view.View>("loading_view")
 
-                // TextView con mensaje
-                android.widget.TextView(context).apply {
-                    text = message
-                    textSize = 14f
-                    setTextColor(android.graphics.Color.parseColor("#FFA500")) // Color naranja
+            if (existingLoading == null) {
+                // Solo agregar si no existe
+                android.widget.LinearLayout(this).apply {
+                    tag = "loading_view"  // ← Importante para encontrarlo después
+                    orientation = android.widget.LinearLayout.VERTICAL
                     gravity = android.view.Gravity.CENTER
-                }.also { addView(it) }
+                    setPadding(0, 50, 0, 0)
 
-                // Progress Bar
-                android.widget.ProgressBar(context).apply {
-                    layoutParams = android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        topMargin = 16
-                    }
-                    isIndeterminate = true
-                }.also { addView(it) }
-            }.also { chartContainer?.addView(it) }
+                    android.widget.TextView(context).apply {
+                        text = message
+                        textSize = 14f
+                        setTextColor(android.graphics.Color.parseColor("#FFA500"))
+                        gravity = android.view.Gravity.CENTER
+                    }.also { addView(it) }
+
+                    android.widget.ProgressBar(context).apply {
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            topMargin = 16
+                        }
+                        isIndeterminate = true
+                    }.also { addView(it) }
+                }.also { chartContainer?.addView(it) }
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error mostrando estado de carga: ${e.message}")
@@ -489,8 +574,6 @@ class SensorDataActivity : BaseVoiceActivity() {
                                 hayProcesoActivo: Boolean, customMessage: String? = null) {
         try {
             val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
-
-            // Iconos diferentes según el estado
             val statusIcon = when {
                 customMessage?.contains("Error", ignoreCase = true) == true -> "❌"
                 customMessage?.contains("Timeout", ignoreCase = true) == true -> "⏰"
@@ -500,10 +583,14 @@ class SensorDataActivity : BaseVoiceActivity() {
 
             titleTextView?.text = "$sensorName $statusIcon"
 
-            // Ocultar gráficas existentes
-            cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)?.visibility = android.view.View.GONE
-            cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)?.visibility = android.view.View.GONE
-            cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)?.visibility = android.view.View.GONE
+            // ✅ Ocultar charts (NO eliminar)
+            val lineChart = cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)
+            val barChart = cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)
+            val pieChart = cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)
+
+            lineChart?.visibility = android.view.View.GONE
+            barChart?.visibility = android.view.View.GONE
+            pieChart?.visibility = android.view.View.GONE
 
             val mensaje = customMessage ?: if (hayProcesoActivo) {
                 "Esperando datos..."
@@ -512,27 +599,36 @@ class SensorDataActivity : BaseVoiceActivity() {
             }
 
             val chartContainer = cardView.findViewById<android.view.ViewGroup>(R.id.chart_container)
-            chartContainer?.removeAllViews()
 
-            android.widget.TextView(this).apply {
-                text = mensaje
-                textSize = 14f
-                // Colores según el estado
-                setTextColor(when {
-                    mensaje.contains("✅") -> android.graphics.Color.parseColor("#4CAF50")
-                    mensaje.contains("❌") -> android.graphics.Color.parseColor("#F44336")
-                    mensaje.contains("⏰") -> android.graphics.Color.parseColor("#FF9800")
-                    else -> android.graphics.Color.GRAY
-                })
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, 50, 0, 0)
-            }.also { chartContainer?.addView(it) }
+            // ✅ Remover solo el loading view, no todos los views
+            val loadingView = chartContainer?.findViewWithTag<android.view.View>("loading_view")
+            loadingView?.let { chartContainer.removeView(it) }
+
+            // Buscar si ya existe un mensaje
+            val existingMessage = chartContainer?.findViewWithTag<android.widget.TextView>("no_data_message")
+
+            if (existingMessage == null) {
+                android.widget.TextView(this).apply {
+                    tag = "no_data_message"
+                    text = mensaje
+                    textSize = 14f
+                    setTextColor(when {
+                        mensaje.contains("✅") -> android.graphics.Color.parseColor("#4CAF50")
+                        mensaje.contains("❌") -> android.graphics.Color.parseColor("#F44336")
+                        mensaje.contains("⏰") -> android.graphics.Color.parseColor("#FF9800")
+                        else -> android.graphics.Color.GRAY
+                    })
+                    gravity = android.view.Gravity.CENTER
+                    setPadding(0, 50, 0, 0)
+                }.also { chartContainer?.addView(it) }
+            } else {
+                existingMessage.text = mensaje
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error mostrando chart vacío: ${e.message}")
         }
     }
-
     private fun showDefaultCharts(hayProcesoActivo: Boolean) {
         Log.d(TAG, "📊 Mostrando gráficas por defecto. Proceso activo: $hayProcesoActivo")
         showNoDataChart(binding.cardTemperatura.root, "Temperatura", hayProcesoActivo)

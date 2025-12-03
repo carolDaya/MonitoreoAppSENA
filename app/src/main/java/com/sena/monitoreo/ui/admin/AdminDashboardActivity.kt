@@ -225,7 +225,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
 
         // Configurar listener del botón de reproducción
         btnPlayMessage.setOnClickListener {
-            val message = "Bienvenido al panel del administrador. Aquí puedes gestionar usuarios, revisar las gráficas y acceder a las funciones de inteligencia artificial."
+            val message = "Bienvenido al panel del administrador. Aquí puedes gestionar usuarios, configurar graficas y asistencia de voz."
 
             voiceManager.applyTtsSettings()
 

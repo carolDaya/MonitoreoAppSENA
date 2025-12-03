@@ -1,8 +1,10 @@
 package com.sena.monitoreo.utils.charts
 
+import android.util.Log
 import android.content.Context
 import android.graphics.Color
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.github.mikephil.charting.charts.BarChart
@@ -19,10 +21,6 @@ class ChartManager(private val context: Context) {
         private const val SENSOR_TEMPERATURA = 2
         private const val SENSOR_PRESION = 3
     }
-
-    /**
-     * Función principal para mostrar el tipo de gráfica seleccionado en el contenedor de la tarjeta.
-     */
     fun displayChart(
         chartType: String,
         cardView: View,
@@ -31,42 +29,85 @@ class ChartManager(private val context: Context) {
         entries: List<Entry>,
         sensorId: Int
     ) {
+        Log.d("ChartManager", "🎨 displayChart INICIADO para $label")
+
         val titleTextView = cardView.findViewById<TextView>(R.id.card_title)
         titleTextView?.text = label
+
+        // ✅ Limpiar mensajes de carga/error previos
+        val chartContainer = cardView.findViewById<ViewGroup>(R.id.chart_container)
+        chartContainer?.findViewWithTag<View>("loading_view")?.let {
+            chartContainer.removeView(it)
+            Log.d("ChartManager", "🗑️ Loading view removido")
+        }
+        chartContainer?.findViewWithTag<View>("no_data_message")?.let {
+            chartContainer.removeView(it)
+            Log.d("ChartManager", "🗑️ No data message removido")
+        }
 
         val lineChart = cardView.findViewById<LineChart>(R.id.chart_line)
         val barChart = cardView.findViewById<BarChart>(R.id.chart_bar)
         val pieChart = cardView.findViewById<PieChart>(R.id.chart_pie)
 
+        Log.d("ChartManager", "🔍 Charts: Line=${lineChart != null}, Bar=${barChart != null}, Pie=${pieChart != null}")
+
+        if (lineChart == null && barChart == null && pieChart == null) {
+            Log.e("ChartManager", "❌ CHARTS NO ENCONTRADOS EN EL LAYOUT")
+            return
+        }
+
+        // Ocultar todos
         lineChart?.visibility = View.GONE
         barChart?.visibility = View.GONE
         pieChart?.visibility = View.GONE
 
-        // Usar lowercase() de forma segura - funciona desde API 1
-        val lowerChartType = chartType.toLowerCase()
+        val lowerChartType = chartType.lowercase(java.util.Locale.US)
 
         when (lowerChartType) {
-            "line" -> lineChart?.apply {
-                visibility = View.VISIBLE
-                setupLineChart(this, label, color, entries)
+            "line" -> {
+                Log.d("ChartManager", "📈 Mostrando LineChart")
+                lineChart?.apply {
+                    visibility = View.VISIBLE
+                    setupLineChart(this, label, color, entries)
+                }
             }
-            "bar" -> barChart?.apply {
-                visibility = View.VISIBLE
-                setupBarChart(this, label, color, entries)
+            "bar" -> {
+                Log.d("ChartManager", "📊 Mostrando BarChart")
+                barChart?.apply {
+                    visibility = View.VISIBLE
+                    setupBarChart(this, label, color, entries)
+                }
             }
             "pie" -> {
+                Log.d("ChartManager", "🥧 Mostrando PieChart")
                 pieChart?.apply {
                     visibility = View.VISIBLE
                     setupPieChart(this, label, entries, sensorId)
                 }
             }
-            else -> lineChart?.apply {
-                visibility = View.VISIBLE
-                setupLineChart(this, label, color, entries)
+            else -> {
+                Log.w("ChartManager", "⚠️ Tipo desconocido, usando LINE")
+                lineChart?.apply {
+                    visibility = View.VISIBLE
+                    setupLineChart(this, label, color, entries)
+                }
+            }
+        }
+
+        Log.d("ChartManager", "✅ displayChart completado")
+    }
+
+    // ✅ Método helper para debug
+    private fun printViewHierarchy(view: View, level: Int) {
+        val indent = "  ".repeat(level)
+        Log.d("ChartManager", "$indent- ${view::class.simpleName} (id: ${view.id})")
+
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                printViewHierarchy(view.getChildAt(i), level + 1)
             }
         }
     }
-
     /**
      * Configura los datos y el estilo de la Gráfica de Línea.
      */
