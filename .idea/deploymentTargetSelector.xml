@@ -21,7 +21,7 @@
           </targets>
         </DialogSelection>
       </SelectionState>
-      <SelectionState runConfigName="SplashActivity">
+      <SelectionState runConfigName="Tests in 'com.sena.monitoreo.ui.auth'">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
     </selectionStates>
