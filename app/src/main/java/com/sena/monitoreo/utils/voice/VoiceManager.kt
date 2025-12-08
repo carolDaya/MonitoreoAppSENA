@@ -194,14 +194,18 @@ class VoiceManager(
     private fun setupProgressListener() {
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
-                // ✅ Solo marcar como "hablando" en la primera oración
+                // ✅ MODIFICACIÓN CRÍTICA: Activar onSpeechStarted si NO estamos hablando
+                // (Esto cubre tanto el primer fragmento de un texto largo como un texto corto)
+                if (!isSpeaking) {
+                    isSpeaking = true
+                    onSpeechStarted?.invoke()
+                    Log.d(TAG, "🎤 TTS iniciado, animacion de waveform activada.")
+                }
+
+                // Lógica de seguimiento de oraciones para textos largos
                 if (utteranceId?.startsWith(SENTENCE_ID_PREFIX) == true) {
                     val sentenceIndex = utteranceId.removePrefix(SENTENCE_ID_PREFIX).toIntOrNull()
-                    if (sentenceIndex == 0 || !isSpeaking) {
-                        isSpeaking = true
-                        onSpeechStarted?.invoke()
-                        Log.d(TAG, "🎤 TTS iniciado en oración #$sentenceIndex")
-                    }
+                    Log.d(TAG, "🎤 Oración #$sentenceIndex de un texto largo iniciada")
                 }
             }
 
