@@ -298,10 +298,12 @@ class AlertsActivity : BaseVoiceActivity() {
 
         if (alertData != null) {
             val fullMessage = formatAnalysisMessage(alertData!!)
-            speakLongTextWithContinuousWaveform(fullMessage)
+            // ✅ CORREGIDO: Usar el método con pausas para texto largo
+            speakWithPausesAndWaveform(fullMessage)
             Log.d(TAG, "🔊 Reproduciendo mensaje largo con waveform continuo: ${fullMessage.length} caracteres")
         } else if (fullAlertMessage.isNotEmpty()) {
-            speakLongTextWithContinuousWaveform(fullAlertMessage)
+            // ✅ CORREGIDO: Usar el método con pausas para texto largo
+            speakWithPausesAndWaveform(fullAlertMessage)
             Log.d(TAG, "🔊 Reproduciendo mensaje del intent con waveform continuo: ${fullAlertMessage.length} caracteres")
         }
     }

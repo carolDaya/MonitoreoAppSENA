@@ -39,8 +39,6 @@ class HomeUserActivity : BaseVoiceActivity() {
         binding = ActivityHomeUserBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
-
         setupNavigation()
         setupVoiceConfiguration()
 
@@ -132,6 +130,7 @@ class HomeUserActivity : BaseVoiceActivity() {
     override fun startSpeaking() {
         super.startSpeaking()
         val message = getString(R.string.welcome_message)
+        // ✅ USANDO EL MÉTODO DE BASE
         speakWithWaveform(message)
     }
 

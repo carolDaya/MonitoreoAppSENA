@@ -73,13 +73,23 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             .get(ProcesoViewModel::class.java)
     }
 
+    // ----------------------------------------------------------
+    // 📌 Variable y Constantes para el mensaje de voz por sección
+    // ----------------------------------------------------------
+    private var currentSectionMessage: String = ""
+
+    companion object {
+        private const val MSG_HOME = "Bienvenido al Panel de Control. Aquí puedes gestionar usuarios, gráficas y la configuración de voz."
+        private const val MSG_GRAPHS = "Estás en la sección de Gráficas. Cambia el tipo de gráfica de los datos de temperatura, presión y metano."
+        private const val MSG_USERS = "Estás en el Gestor de Usuarios. Aquí puedes ver y cambiar el estado de los usuarios activos y bloqueados."
+        private const val MSG_AI = "Estás en la Configuración de Voz. Ajusta el tono y el género de la voz para la asistencia del sistema."
+    }
+
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAdminDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         initializeManagers()
         setupNavigationDrawer()
@@ -93,9 +103,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
 
         handleScrollToSection()
 
-        if (intent.getStringExtra("SCROLL_TO") == null) {
-            showSection(home = true)
-        }
+        // ❌ ELIMINADO: Se quita la llamada automática a startSpeaking() aquí.
     }
 
     // ----------------------------------------------------------
@@ -104,7 +112,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
     override fun onNetworkRetry() {
         Log.d(TAG, "🔄 Reintentando conexión desde NetworkErrorActivity...")
 
-        // Recargar todos los datos que puedan haber fallado por red
         chartManager.loadInitialCharts(
             binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp,
             binding.graficasAdminSection.graphContainerPressure, binding.graficasAdminSection.btnChangePressure,
@@ -142,7 +149,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             if (message.contains("Error de red", ignoreCase = true) || message.contains("IOException", ignoreCase = true)) {
                 showNetworkError(message)
             } else if (!message.contains("éxito", ignoreCase = true) && message.isNotEmpty()) {
-                // Mostrar otros errores que no sean de red como snackbar
                 UiUtils.showSnackbar(binding.root, message, isError = true)
             } else if (message.contains("éxito", ignoreCase = true)) {
                 UiUtils.showSnackbar(binding.root, message, isError = false)
@@ -164,7 +170,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
                 showNetworkError(message)
             } else if (message.isNotEmpty() && !message.contains("Proceso activo", ignoreCase = true) &&
                 !message.contains("Proceso inactivo", ignoreCase = true)) {
-                // Mostrar otros errores del proceso como snackbar
                 UiUtils.showSnackbar(binding.root, message, isError = true)
             }
         }
@@ -223,23 +228,27 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             lifecycleOwner = this
         )
 
-        // Configurar listener del botón de reproducción
+        // ✅ LÓGICA CORRECTA: Reproducirá solo al hacer clic en el botón.
         btnPlayMessage.setOnClickListener {
-            val message = "Bienvenido al panel del administrador. Aquí puedes gestionar usuarios, configurar graficas y asistencia de voz."
-
-            voiceManager.applyTtsSettings()
-
             if (!voiceManager.isSpeaking) {
-                voiceManager.speak(message)
-                waveformManager.startTimedAnimation(totalDurationMs = 8000L, lifecycleScope) {
-                    btnPlayMessage.setIconResource(R.drawable.ic_play)
-                }
-                btnPlayMessage.setIconResource(R.drawable.ic_stop)
+                startSpeaking() // Reproduce currentSectionMessage
             } else {
-                voiceManager.stop()
-                waveformManager.stopAnimation()
-                btnPlayMessage.setIconResource(R.drawable.ic_play)
+                stopSpeaking() // Detiene la voz y la animación
             }
+        }
+    }
+
+    // ----------------------------------------------------------
+    // 🔊 Reproducción de Mensaje de Voz Específico (Sobreescrito)
+    // ----------------------------------------------------------
+    override fun startSpeaking() {
+        // La configuración de TTS ya se aplica en onVoiceInitialized y al cambiar en el helper
+        super.startSpeaking()
+
+        if (currentSectionMessage.isNotEmpty()) {
+            Log.d(TAG, "🔊 Reproduciendo mensaje de sección: $currentSectionMessage")
+            // Usamos el método de texto corto (speakWithWaveform) que maneja la sincronización.
+            speakWithWaveform(currentSectionMessage)
         }
     }
 
@@ -276,8 +285,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
                 Log.d(TAG, "Usuarios cargados (ViewModel): ${users.size}")
             }
         }
-
-        userViewModel.loadAllUsers(estado = "activo")
     }
 
     private fun setupRecyclerView() {
@@ -351,7 +358,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
     }
 
     // ----------------------------------------------------------
-    // 🧭 Lógica de Navegación (Corregida la Visibilidad)
+    // 🧭 Lógica de Navegación (Solo cambia mensaje, NO habla automáticamente)
     // ----------------------------------------------------------
     private fun setupNavigationDrawer() {
         headerBinding = HeaderLayoutAdminBinding.bind(binding.mainHeader.root)
@@ -371,9 +378,15 @@ class AdminDashboardActivity : BaseVoiceActivity() {
         binding.navView.setNavigationItemSelectedListener { menuItem ->
             menuItem.isChecked = true
             binding.adminDashboard.closeDrawers()
-            navigationManager.handleAdminNavigation(menuItem.itemId)
 
-            if (menuItem.itemId == R.id.nav_logout) performLogout()
+            // Navegación especial para AdminDashboardActivity (cambia de sección)
+            when (menuItem.itemId) {
+                R.id.nav_graphis -> showSection(graphs = true)
+                R.id.nav_volumen -> showSection(ai = true)
+                R.id.nav_users -> showSection(users = true)
+                R.id.nav_logout -> performLogout()
+                else -> navigationManager.handleAdminNavigation(menuItem.itemId) // Otras navegaciones
+            }
             true
         }
     }
@@ -385,26 +398,54 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             "ai" -> showSection(ai = true)
             "users" -> {
                 showSection(users = true)
-                userViewModel.loadAllUsers()
+                userViewModel.loadAllUsers(estado = getCurrentUserFilter())
             }
+            else -> showSection(home = true) // Por defecto, mostrar todas
         }
     }
 
     /**
-     * Controla la visibilidad de las secciones.
-     * Si home=true, muestra todas las secciones (Dashboard).
+     * Controla la visibilidad de las secciones y define el mensaje de voz actual.
+     * ❌ Eliminada la llamada a startSpeaking() al final.
      */
     private fun showSection(home: Boolean = false, graphs: Boolean = false, ai: Boolean = false, users: Boolean = false) {
         with(binding) {
+            // 1. Ocultar todas las secciones primero
+            graficasAdminSection.root.visibility = View.GONE
+            iaAdminSection.root.visibility = View.GONE
+            userAdminSection.root.visibility = View.GONE
+
+            // 2. Determinar la sección a mostrar y el mensaje
             if (home) {
                 graficasAdminSection.root.visibility = View.VISIBLE
                 iaAdminSection.root.visibility = View.VISIBLE
                 userAdminSection.root.visibility = View.VISIBLE
+                currentSectionMessage = MSG_HOME
+            } else if (graphs) {
+                graficasAdminSection.root.visibility = View.VISIBLE
+                iaAdminSection.root.visibility = View.GONE
+                userAdminSection.root.visibility = View.GONE
+                currentSectionMessage = MSG_GRAPHS
+            } else if (ai) {
+                graficasAdminSection.root.visibility = View.GONE
+                iaAdminSection.root.visibility = View.VISIBLE
+                userAdminSection.root.visibility = View.GONE
+                currentSectionMessage = MSG_AI
+            } else if (users) {
+                graficasAdminSection.root.visibility = View.GONE
+                iaAdminSection.root.visibility = View.GONE
+                userAdminSection.root.visibility = View.VISIBLE
+                currentSectionMessage = MSG_USERS
             } else {
-                graficasAdminSection.root.visibility = if (graphs) View.VISIBLE else View.GONE
-                iaAdminSection.root.visibility = if (ai) View.VISIBLE else View.GONE
-                userAdminSection.root.visibility = if (users) View.VISIBLE else View.GONE
+                currentSectionMessage = MSG_HOME // Fallback
             }
+
+            // 3. Detener voz anterior si estaba activa (siempre se detiene al cambiar de sección)
+            if (voiceManager.isSpeaking) {
+                stopSpeaking()
+            }
+
+            // 4. ❌ IMPORTANTE: NO LLAMAR startSpeaking() aquí. Se deja al clic.
         }
     }
 

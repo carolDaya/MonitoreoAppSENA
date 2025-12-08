@@ -2,15 +2,11 @@ package com.sena.monitoreo.ui.base
 
 import android.os.Bundle
 import android.util.Log
-import android.view.View
-import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.masoudss.lib.WaveformSeekBar
 import com.sena.monitoreo.R
 import com.sena.monitoreo.data.model.ai.AnalisisResponse
-import com.sena.monitoreo.utils.NetworkRetryListener // Importar la interfaz
 import com.sena.monitoreo.utils.voice.VoiceManager
 import com.sena.monitoreo.utils.voice.WaveformManager
 import kotlinx.coroutines.launch
@@ -27,6 +23,7 @@ abstract class BaseVoiceActivity : BaseActivity() {
     protected lateinit var waveformSeekBar: WaveformSeekBar
 
     var isVoiceInitialized = false
+    private val TAG = "BaseVoiceActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,99 +66,51 @@ abstract class BaseVoiceActivity : BaseActivity() {
         voiceManager.stop()
         waveformManager.stopAnimation()
         btnPlay.setIconResource(R.drawable.ic_play)
+        // Asegurarse de limpiar los listeners después de detener
+        voiceManager.setOnUtteranceCompletedListener { }
+        voiceManager.setOnSpeechStartedListener { } // ✅ Limpiar el nuevo listener
     }
 
+    // MÉTODO ÚNICO PARA TEXTO CORTO
     protected fun speakWithWaveform(text: String) {
         if (!isVoiceInitialized) return
-
-        voiceManager.speak(text)
-        lifecycleScope.launch {
-            waveformManager.startAnimation(text.length, this) {
-                stopSpeaking()
-            }
-        }
+        startSpeakingAction(text, false)
     }
 
-    protected fun speakLongTextWithWaveform(fullText: String) {
-        if (!isVoiceInitialized) return
-
-        // Calcular duración estimada (más tiempo para textos largos)
-        val estimatedDurationMs = (fullText.length * 100L).coerceAtLeast(5000L)
-
-        voiceManager.speakLongText(fullText)
-        lifecycleScope.launch {
-            waveformManager.startLongAnimation(estimatedDurationMs, this) {
-                // Verificar si aún está hablando
-                if (!voiceManager.isCurrentlySpeaking()) {
-                    stopSpeaking()
-                }
-            }
-        }
-    }
-
+    // MÉTODO ÚNICO PARA TEXTO LARGO
     protected fun speakWithPausesAndWaveform(text: String, pauseBetweenSentences: Long = 800) {
         if (!isVoiceInitialized) return
-
-        val estimatedDurationMs = (text.length * 120L).coerceAtLeast(6000L)
-
-        voiceManager.speakWithPauses(text, pauseBetweenSentences)
-        lifecycleScope.launch {
-            waveformManager.startLongAnimation(estimatedDurationMs, this) {
-                if (!voiceManager.isCurrentlySpeaking()) {
-                    stopSpeaking()
-                }
-            }
-        }
+        startSpeakingAction(text, true, pauseBetweenSentences)
     }
 
-    protected fun speakLongTextWithContinuousWaveform(fullText: String) {
-        if (!isVoiceInitialized) return
-
-        Log.d("BaseVoiceActivity", "🔊 Iniciando reproducción larga con waveform continuo")
-
-        // Configurar callback para cuando termine la voz
+    // ✅ Lógica centralizada para iniciar la voz y el waveform continuo
+    private fun startSpeakingAction(text: String, isLongText: Boolean, pause: Long = 800) {
+        // 1. Configurar el callback para cuando termine la voz (detiene la animación)
         voiceManager.setOnUtteranceCompletedListener {
-            Log.d("BaseVoiceActivity", "🔊 Callback: Voz terminó, deteniendo waveform")
+            Log.d(TAG, "🔊 Callback: Voz terminó, deteniendo waveform")
             lifecycleScope.launch {
-                // Pequeño delay para asegurar que realmente terminó
-                kotlinx.coroutines.delay(300)
+                kotlinx.coroutines.delay(200)
                 stopSpeaking()
             }
         }
 
-        // Iniciar animación CONTINUA (no basada en tiempo)
-        lifecycleScope.launch {
-            waveformManager.startContinuousAnimation(this) {
-                Log.d("BaseVoiceActivity", "🔊 Waveform continuo terminó")
-            }
-        }
-
-        // Reproducir texto largo con callback
-        voiceManager.speakLongTextWithCallback(fullText)
-    }
-
-    protected fun speakLongTextWithTimedWaveform(fullText: String) {
-        if (!isVoiceInitialized) return
-
-        // Calcular duración estimada (más conservadora)
-        val estimatedDurationMs = (fullText.length * 120L).coerceAtLeast(8000L)
-
-        // Iniciar animación por TIEMPO
-        lifecycleScope.launch {
-            waveformManager.startTimedAnimation(estimatedDurationMs, this) {
-                // Verificar si la voz sigue hablando
-                if (voiceManager.isCurrentlySpeaking()) {
-                    // Si sigue hablando, continuar la animación
-                    Log.d("BaseVoiceActivity", "🔊 Tiempo agotado pero voz sigue, continuando animación")
-                    waveformManager.startContinuousAnimation(this)
-                } else {
-                    stopSpeaking()
+        // 2. Configurar el callback para cuando la voz COMIENCE (inicia la animación)
+        voiceManager.setOnSpeechStartedListener {
+            Log.d(TAG, "▶️ TTS empezó a hablar, iniciando waveform continuo.")
+            lifecycleScope.launch {
+                // ✅ INICIAR animación CONTINUA SOLO CUANDO el TTS haya iniciado el sonido
+                waveformManager.startContinuousAnimation(this) {
+                    Log.d(TAG, "🔊 Waveform continuo terminó")
                 }
             }
         }
 
-        // Reproducir texto largo
-        voiceManager.speakLongText(fullText)
+        // 3. Reproducir texto (esto inicia el proceso en el motor TTS, pero la animación espera)
+        if (isLongText) {
+            voiceManager.speakLongText(text, pause)
+        } else {
+            voiceManager.speak(text)
+        }
     }
 
     protected fun formatAnalysisMessage(analisis: AnalisisResponse): String {

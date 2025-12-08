@@ -14,7 +14,6 @@ class VoiceManager(
     companion object {
         private const val TAG = "VoiceManager"
         private const val UTTERANCE_ID_PREFIX = "TTS_ID_"
-        private const val CHUNK_ID_PREFIX = "TTS_CHUNK_"
         private const val SENTENCE_ID_PREFIX = "SENTENCE_"
     }
 
@@ -34,6 +33,8 @@ class VoiceManager(
     private val preferredFemaleVoices = listOf("female", "mujer", "femenino", "woman", "efb")
 
     private var onUtteranceCompleted: (() -> Unit)? = null
+    // ✅ NUEVO: Callback para notificar cuando el TTS realmente empieza a hablar
+    private var onSpeechStarted: (() -> Unit)? = null
 
     fun initialize() {
         tts = TextToSpeech(context, this)
@@ -53,6 +54,12 @@ class VoiceManager(
     fun setOnUtteranceCompletedListener(listener: () -> Unit) {
         this.onUtteranceCompleted = listener
     }
+
+    // ✅ NUEVO: Setter para el listener de inicio de voz
+    fun setOnSpeechStartedListener(listener: () -> Unit) {
+        this.onSpeechStarted = listener
+    }
+
     fun applyTtsSettings() {
         if (tts == null || !isReady) {
             Log.w(TAG, "TTS no está listo para aplicar settings")
@@ -93,12 +100,15 @@ class VoiceManager(
         setupProgressListener()
         Log.d(TAG, "✅ Configuración de voz aplicada exitosamente")
     }
+
     private fun setupProgressListener() {
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {isSpeaking = true }
+            override fun onStart(utteranceId: String?) {
+                isSpeaking = true
+                onSpeechStarted?.invoke() // ✅ Llamar aquí para iniciar el waveform
+            }
             override fun onDone(utteranceId: String?) {
                 isSpeaking = false
-                if (utteranceId != null && utteranceId.startsWith(CHUNK_ID_PREFIX)) { }
                 onUtteranceCompleted?.invoke()
             }
 
@@ -152,29 +162,19 @@ class VoiceManager(
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "$UTTERANCE_ID_PREFIX${System.currentTimeMillis()}")
     }
 
-    fun speakLongText(fullText: String, chunkSize: Int = 200) {
-        if (!isReady) {
-            Log.w(TAG, "TTS no está listo")
-            return
-        }
-
-        val chunks = fullText.chunked(chunkSize)
-
-        tts?.speak(chunks[0], TextToSpeech.QUEUE_FLUSH, null, "${CHUNK_ID_PREFIX}0")
-
-        for (i in 1 until chunks.size) {
-            tts?.speak(chunks[i], TextToSpeech.QUEUE_ADD, null, "$CHUNK_ID_PREFIX$i")
-        }
-    }
-
-    fun speakLongTextWithCallback(fullText: String, chunkSize: Int = 200) {
-        speakLongText(fullText, chunkSize)
+    fun speakLongText(fullText: String, pauseBetweenSentences: Long = 800) {
+        speakWithPauses(fullText, pauseBetweenSentences)
     }
 
     fun speakWithPauses(text: String, pauseBetweenSentences: Long = 500) {
         if (!isReady) return
 
-        val sentences = text.split(Regex("[.!?]\\s")).map { it.trim() }.filter { it.isNotEmpty() }
+        val sentences = text.split(Regex("(?<=[.!?])\\s*")).map { it.trim() }.filter { it.isNotEmpty() }
+
+        if (sentences.size == 1) {
+            tts?.speak(sentences[0], TextToSpeech.QUEUE_FLUSH, null, "$SENTENCE_ID_PREFIX${System.currentTimeMillis()}")
+            return
+        }
 
         sentences.forEachIndexed { index, sentence ->
             val utteranceId = "$SENTENCE_ID_PREFIX$index"
@@ -200,5 +200,6 @@ class VoiceManager(
         isReady = false
         isSpeaking = false
         onUtteranceCompleted = null
+        onSpeechStarted = null // Limpiar el nuevo listener también
     }
 }
