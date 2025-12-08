@@ -35,7 +35,6 @@ class SignupActivity : BaseActivity() {
         binding = ActivitySignupBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.containerSignup) { view, insets ->
             val systemBarsInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -48,7 +47,6 @@ class SignupActivity : BaseActivity() {
     }
 
     override fun onNetworkRetry() {
-        // Reintentar el registro automáticamente con los datos actuales
         registerUser()
     }
 

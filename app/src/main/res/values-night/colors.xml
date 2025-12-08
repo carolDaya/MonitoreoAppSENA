@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Color del hint para modo oscuro -->
+    <color name="input_hint_color">#424242</color>
+</resources>

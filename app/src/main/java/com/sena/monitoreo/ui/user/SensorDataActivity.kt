@@ -308,7 +308,7 @@ class SensorDataActivity : BaseVoiceActivity() {
 
     private fun showTestAlertDialog() {
         AlertDialog.Builder(this)
-            .setTitle("🧪 Modo Desarrollo")
+            .setTitle("Modo Desarrollo")
             .setMessage("¿Forzar verificación de alerta?")
             .setPositiveButton("Sí") { _, _ ->
                 alertManager.forceAlertCheck(lifecycleScope)

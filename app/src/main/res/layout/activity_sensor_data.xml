@@ -14,7 +14,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- CONTENIDO NORMAL - ESTE SE OCULTA CUANDO HAY ERROR -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/main_content"
             android:layout_width="match_parent"
@@ -30,6 +29,7 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
+
             <ImageButton
                 android:id="@+id/btn_manual_refresh"
                 android:layout_width="48dp"
@@ -40,30 +40,30 @@
                 android:padding="8dp"
                 android:src="@drawable/ic_refresh"
                 app:tint="@color/teal_dark"
-                app:layout_constraintBottom_toTopOf="@id/main_scroll"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/header_user" />
+                app:layout_constraintTop_toBottomOf="@id/header_user"
+                app:layout_constraintBottom_toTopOf="@id/main_scroll"
+                app:layout_constraintVertical_bias="0.5"
+                android:layout_marginTop="@dimen/spacing_small"
+                android:layout_marginBottom="@dimen/spacing_small"/>
             <androidx.core.widget.NestedScrollView
                 android:id="@+id/main_scroll"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
-                android:layout_marginTop="@dimen/spacing_small"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/header_user">
-
+                app:layout_constraintTop_toBottomOf="@id/btn_manual_refresh">
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="@dimen/spacing_large">
-
+                    android:padding="@dimen/spacing_large"
+                    android:paddingTop="@dimen/spacing_small">
                     <include
                         android:id="@+id/card_mq4"
                         layout="@layout/include_card_sensor_user"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_large"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
@@ -86,8 +86,8 @@
                         android:layout_marginTop="@dimen/spacing_large"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@id/card_temperatura" />
-
+                        app:layout_constraintTop_toBottomOf="@id/card_temperatura"
+                        app:layout_constraintBottom_toBottomOf="parent"/>
                 </androidx.constraintlayout.widget.ConstraintLayout>
             </androidx.core.widget.NestedScrollView>
 
@@ -95,7 +95,6 @@
 
     </FrameLayout>
 
-    <!-- NAVEGACIÓN LATERAL -->
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
         android:layout_width="wrap_content"

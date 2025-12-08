@@ -83,9 +83,11 @@ abstract class BaseVoiceActivity : BaseActivity() {
         startSpeakingAction(text, true, pauseBetweenSentences)
     }
 
-    // ✅ Lógica centralizada para iniciar la voz y el waveform continuo
     private fun startSpeakingAction(text: String, isLongText: Boolean, pause: Long = 800) {
-        // 1. Configurar el callback para cuando termine la voz (detiene la animación)
+        // ✅ AGREGAR LOG AQUÍ TAMBIÉN
+        Log.d(TAG, "🎤 Iniciando TTS con texto: $text")
+        Log.d(TAG, "📏 Longitud del texto: ${text.length} caracteres")
+
         voiceManager.setOnUtteranceCompletedListener {
             Log.d(TAG, "🔊 Callback: Voz terminó, deteniendo waveform")
             lifecycleScope.launch {
@@ -94,18 +96,15 @@ abstract class BaseVoiceActivity : BaseActivity() {
             }
         }
 
-        // 2. Configurar el callback para cuando la voz COMIENCE (inicia la animación)
         voiceManager.setOnSpeechStartedListener {
             Log.d(TAG, "▶️ TTS empezó a hablar, iniciando waveform continuo.")
             lifecycleScope.launch {
-                // ✅ INICIAR animación CONTINUA SOLO CUANDO el TTS haya iniciado el sonido
                 waveformManager.startContinuousAnimation(this) {
                     Log.d(TAG, "🔊 Waveform continuo terminó")
                 }
             }
         }
 
-        // 3. Reproducir texto (esto inicia el proceso en el motor TTS, pero la animación espera)
         if (isLongText) {
             voiceManager.speakLongText(text, pause)
         } else {
@@ -115,24 +114,44 @@ abstract class BaseVoiceActivity : BaseActivity() {
 
     protected fun formatAnalysisMessage(analisis: AnalisisResponse): String {
         return buildString {
-            append(analisis.mensaje_lectura.replace("|", " y "))
-            append(". ")
-            append("Recomendación del sistema: ")
-            append(analisis.recomendacion)
-            append(". ")
-            append("Este es un: ${analisis.tipo_alerta_modelo}")
-            append(". ")
-            append("Estado general: ${analisis.tipo_estado}")
-            append(". ")
-            append("Por favor, tome las medidas necesarias.")
-        }
-    }
+            // ✅ Limpiar el mensaje
+            val mensajeLimpio = analisis.mensaje_lectura
+                .replace("|", " y ")
+                .replace("\\u00b0", " grados ")
+                .replace("°", " grados ")
+                .replace(Regex("\\.{2,}"), ".") // Reemplazar .. por .
+                .trim()
 
-    protected fun formatShortAnalysisMessage(analisis: AnalisisResponse): String {
-        return buildString {
-            append("Alerta: ${analisis.tipo_estado}. ")
-            append(analisis.mensaje_lectura.replace("|", " y "))
-            append(". Recomendación: ${analisis.recomendacion}")
+            append(mensajeLimpio)
+
+            // ✅ Solo agregar punto si no termina con uno
+            if (!mensajeLimpio.endsWith(".")) {
+                append(".")
+            }
+            append(" ")
+
+            if (analisis.recomendacion.isNotEmpty()) {
+                append("Recomendación del sistema: ")
+                append(analisis.recomendacion)
+                if (!analisis.recomendacion.endsWith(".")) {
+                    append(".")
+                }
+                append(" ")
+            }
+
+            if (analisis.tipo_alerta_modelo.isNotEmpty()) {
+                append("Este es un tipo de alerta: ${analisis.tipo_alerta_modelo}.")
+                append(" ")
+            }
+
+            if (analisis.tipo_estado.isNotEmpty()) {
+                append("Estado general del sistema: ${analisis.tipo_estado}.")
+                append(" ")
+            }
+
+            append("Por favor, tome las medidas necesarias.")
+        }.trim().also {
+            Log.d("BaseVoiceActivity", "📝 Mensaje formateado: $it")
         }
     }
 

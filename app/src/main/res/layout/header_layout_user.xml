@@ -8,8 +8,6 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <!-- Imagen decorativa, excluida de accesibilidad -->
-
     <ImageView
         android:id="@+id/header_background_image"
         android:layout_width="0dp"
@@ -17,7 +15,7 @@
         android:layout_marginTop="4dp"
         android:contentDescription="@null"
         android:importantForAccessibility="no"
-        android:scaleType="centerCrop"
+        android:scaleType="fitXY"
         android:src="@drawable/img_header_screen_main"
         app:layout_constraintDimensionRatio="3:1"
         app:layout_constraintEnd_toEndOf="parent"
@@ -50,8 +48,9 @@
 
     <TextView
         android:id="@+id/user_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="98dp"
+        android:layout_height="22dp"
+        android:layout_marginStart="@dimen/spacing_small"
         android:layout_marginEnd="@dimen/spacing_small"
         android:ellipsize="end"
         android:singleLine="true"
@@ -61,9 +60,9 @@
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@+id/user_icon"
         app:layout_constraintEnd_toStartOf="@+id/user_icon"
+        app:layout_constraintHorizontal_bias="1.0"
+        app:layout_constraintStart_toEndOf="@id/settings_icon"
         app:layout_constraintTop_toTopOf="@+id/user_icon" />
-
-    <!-- WAVEFORM (opcional, si quieres que quede debajo del switch) -->
     <include
         android:id="@+id/waveform_section"
         layout="@layout/wave_form"
@@ -73,5 +72,4 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="@dimen/spacing_medium" />
-
 </androidx.constraintlayout.widget.ConstraintLayout>
