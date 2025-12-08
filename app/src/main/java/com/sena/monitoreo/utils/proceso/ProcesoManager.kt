@@ -81,13 +81,13 @@ class ProcesoManager(
         if (activo) {
             btnIniciar.visibility = View.GONE
             btnFinalizar.visibility = View.VISIBLE
-            tvEstado.text = "🟢 Proceso activo"
-            tvEstado.setTextColor(ContextCompat.getColor(context, R.color.turquoise))
+            tvEstado.text = "Proceso activo"
+            tvEstado.setTextColor(ContextCompat.getColor(context, R.color.teal_dark))
         } else {
             btnIniciar.visibility = View.VISIBLE
             btnFinalizar.visibility = View.GONE
-            tvEstado.text = "🔴 Proceso inactivo"
-            tvEstado.setTextColor(ContextCompat.getColor(context, R.color.red))
+            tvEstado.text = "Proceso inactivo"
+            tvEstado.setTextColor(ContextCompat.getColor(context, R.color.temp_color))
         }
 
         // Actualizar estados de botones
