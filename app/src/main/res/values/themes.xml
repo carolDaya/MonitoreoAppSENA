@@ -60,6 +60,7 @@
     <style name="Widget.App.TextInputLayout.OutlinedBox.Green" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
         <item name="hintTextColor">@color/gray_500</item>
         <item name="boxStrokeColor">@color/green_icon</item>
+        <item name="android:textColor">@color/black</item>
         <item name="startIconTint">@color/green_icon</item>
     </style>
 

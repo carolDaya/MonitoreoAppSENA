@@ -81,6 +81,7 @@ class SensorDataActivity : BaseVoiceActivity() {
         setupNavigation()
         setupVoiceConfiguration()
         setupAlertTestButton()
+        setupManualRefreshButton() // ✅ NUEVO: Configurar botón de recarga manual
         handleIntentNavigation()
 
         // ✅ MEJORADO: Carga inteligente con caché
@@ -112,7 +113,7 @@ class SensorDataActivity : BaseVoiceActivity() {
             // Cargar sensores
             if (cachedConfiguraciones != null) {
                 Log.d(TAG, "✅ Cargando sensores con configuraciones")
-                loadSensorsAndCharts(estadoProceso)
+                loadSensorsAndCharts(estadoProceso, isManualRefresh = false) // Indica que no es manual
             } else {
                 Log.w(TAG, "⚠️ Sin configuraciones - mostrando defaults")
                 showDefaultCharts(estadoProceso)
@@ -125,7 +126,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                 Log.d(TAG, "🔄 Actualización de estado detectada: $activo")
                 lifecycleScope.launch {
                     if (cachedConfiguraciones != null) {
-                        loadSensorsAndCharts(activo)
+                        loadSensorsAndCharts(activo, isManualRefresh = false) // Indica que no es manual
                     }
                 }
             }
@@ -133,6 +134,37 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         startChartRefreshLoop()
     }
+
+    private fun setupManualRefreshButton() {
+        binding.btnManualRefresh.setOnClickListener {
+            Log.d(TAG, "Manual Refresh - Botón presionado")
+            // Mostrar loading inmediatamente
+            UiUtils.showLoading(this, "Recargando datos manualmente...")
+
+            // Iniciar la recarga en una corrutina
+            lifecycleScope.launch {
+                val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
+
+                // 1. Recargar configuraciones si es necesario
+                val configCacheAge = System.currentTimeMillis() - lastConfigLoadTime
+                val needsConfigReload = cachedConfiguraciones == null || configCacheAge > CONFIG_CACHE_DURATION
+                if (needsConfigReload) {
+                    loadConfiguraciones()
+                }
+
+                // 2. Forzar la recarga de datos de sensores
+                if (cachedConfiguraciones != null) {
+                    loadSensorsAndCharts(estadoProceso, isManualRefresh = true) // ✅ INDICA RECARGA MANUAL
+                } else {
+                    // Si aún no hay configuraciones, solo mostrar el estado por defecto
+                    showDefaultCharts(estadoProceso)
+                }
+                UiUtils.hideLoading()
+                UiUtils.showSnackbar(binding.root, "Datos actualizados", false)
+            }
+        }
+    }
+
 
     private fun handleIntentNavigation() {
         intent.getStringExtra("SENSOR_TYPE")?.let { sensorType ->
@@ -147,7 +179,7 @@ class SensorDataActivity : BaseVoiceActivity() {
      * Navegación por scroll a cards específicas - MÉTODO PÚBLICO
      */
     fun navigateToCard(cardType: String) {
-        Log.d(TAG, "🎯 Navegando a card: $cardType")
+        Log.d(TAG, "Navegando a card: $cardType")
 
         when (cardType.uppercase()) {
             "GAS" -> {
@@ -350,7 +382,7 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
 
-    private suspend fun loadSensorsAndCharts(hayProcesoActivo: Boolean) {
+    private suspend fun loadSensorsAndCharts(hayProcesoActivo: Boolean, isManualRefresh: Boolean) { // ✅ Modificado
         val configuraciones = cachedConfiguraciones ?: run {
             Log.w(TAG, "📭 No hay configuraciones en caché - mostrando gráficas por defecto")
             runOnUiThread {
@@ -359,16 +391,20 @@ class SensorDataActivity : BaseVoiceActivity() {
             return
         }
 
-        Log.d(TAG, "🚀 Cargando ${configuraciones.size} sensores. Proceso activo: $hayProcesoActivo")
+        Log.d(TAG, "🚀 Cargando ${configuraciones.size} sensores. Proceso activo: $hayProcesoActivo. Manual: $isManualRefresh")
 
-        // ✅ NO mostrar loading si hay datos en caché
+        // ✅ MOSTRAR loading SOLAMENTE en la carga INICIAL o MANUAL
         val hayCacheDatos = configuraciones.any { config ->
             SensorCache.isFresh(config.sensor_id)
         }
 
-        if (!hayCacheDatos && hayProcesoActivo) {
-            Log.d(TAG, "📊 No hay caché fresco - mostrando loading")
-            UiUtils.showLoading(this, "Actualizando datos...")
+        if ((!hayCacheDatos && hayProcesoActivo) || isManualRefresh) { // ✅ Condición ajustada
+            Log.d(TAG, "📊 Forzando carga/refresco - mostrando loading")
+            // El loading de UI ya se maneja fuera de esta función en el flujo manual,
+            // pero lo dejamos por si se llama desde el flujo automático sin caché fresco.
+            if (!isManualRefresh) {
+                UiUtils.showLoading(this, "Actualizando datos...")
+            }
         } else {
             Log.d(TAG, "⚡ Hay caché disponible - carga rápida sin loading")
         }
@@ -376,7 +412,8 @@ class SensorDataActivity : BaseVoiceActivity() {
         try {
             for (config in configuraciones) {
                 Log.d(TAG, "🔄 Procesando sensor ${config.sensor_id}...")
-                loadSensorData(config, hayProcesoActivo)
+                // Aquí, el argumento isManualRefresh se pasa a loadSensorData
+                loadSensorData(config, hayProcesoActivo, isManualRefresh)
                 delay(100) // ✅ Reducido a 100ms para carga más rápida
             }
             Log.d(TAG, "✅ Todos los sensores procesados")
@@ -389,11 +426,13 @@ class SensorDataActivity : BaseVoiceActivity() {
                 UiUtils.showSnackbar(binding.root, "Error: ${e.message}", true)
             }
         } finally {
-            UiUtils.hideLoading()
+            if (!isManualRefresh) {
+                UiUtils.hideLoading() // Ocultar solo si no es recarga manual
+            }
         }
     }
 
-    private suspend fun loadSensorData(config: GraficaResponse, hayProcesoActivo: Boolean) {
+    private suspend fun loadSensorData(config: GraficaResponse, hayProcesoActivo: Boolean, isManualRefresh: Boolean = false) { // ✅ Modificado
         val sensorId = config.sensor_id
         val tipoGrafica = config.tipo_grafica
         val color = chartManager.getSensorColor(sensorId)
@@ -408,8 +447,9 @@ class SensorDataActivity : BaseVoiceActivity() {
             }
         }
 
-        // ✅ PRIMERO: Intentar cargar desde caché (SIEMPRE)
-        val cachedLecturas = SensorCache.get(sensorId)
+        // ✅ PRIMERO: Intentar cargar desde caché (SIEMPRE, a menos que sea recarga manual)
+        val cachedLecturas = if (!isManualRefresh) SensorCache.get(sensorId) else null // ✅ ANULAMOS CACHÉ SI ES MANUAL
+
         if (cachedLecturas != null) {
             Log.d(TAG, "⚡ CARGA INSTANTÁNEA desde caché: $nombreSensor (${cachedLecturas.size} lecturas)")
             runOnUiThread {
@@ -433,15 +473,16 @@ class SensorDataActivity : BaseVoiceActivity() {
             return
         }
 
-        // ✅ SEGUNDO: Si no hay caché, cargar desde red (solo si proceso activo)
-        if (!hayProcesoActivo) {
+        // ✅ SEGUNDO: Si no hay caché O es recarga manual, cargar desde red
+        if (!hayProcesoActivo && !isManualRefresh) { // Si no hay proceso y no es manual, solo muestra "inactivo"
             runOnUiThread {
                 showNoDataChart(cardView, nombreSensor, false)
             }
             return
         }
 
-        Log.d(TAG, "📡 Cargando desde red: $nombreSensor")
+        // Si hay proceso activo O es recarga manual, cargamos desde la red
+        Log.d(TAG, "📡 Cargando desde red: $nombreSensor (Forzado: $isManualRefresh)")
 
         try {
             val lecturaResult = withTimeout(15000) {
@@ -474,6 +515,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                 is ResultWrapper.Error -> {
                     Log.e(TAG, "❌ Error $nombreSensor: ${lecturaResult.message}")
                     runOnUiThread {
+                        // Usar el mensaje genérico para el flujo manual/automático si falla
                         showNoDataChart(cardView, nombreSensor, hayProcesoActivo, "🌐 Error de conexión")
                     }
                 }
@@ -499,6 +541,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                 val result = lecturaRepo.getLecturas(sensorId)
                 if (result is ResultWrapper.Success && result.data.isNotEmpty()) {
                     SensorCache.put(sensorId, result.data)
+                    // No es necesario actualizar la UI aquí, solo la caché
                     Log.d(TAG, "🔄 Cache actualizado en background: sensor $sensorId")
                 }
             }
@@ -524,7 +567,7 @@ class SensorDataActivity : BaseVoiceActivity() {
             val titleTextView = cardView.findViewById<android.widget.TextView>(R.id.card_title)
             titleTextView?.text = "$sensorName 🔄"
 
-            // ✅ NO ELIMINAR - Solo ocultar los charts
+            //  NO ELIMINAR - Solo ocultar los charts
             val lineChart = cardView.findViewById<com.github.mikephil.charting.charts.LineChart>(R.id.chart_line)
             val barChart = cardView.findViewById<com.github.mikephil.charting.charts.BarChart>(R.id.chart_bar)
             val pieChart = cardView.findViewById<com.github.mikephil.charting.charts.PieChart>(R.id.chart_pie)
@@ -535,7 +578,7 @@ class SensorDataActivity : BaseVoiceActivity() {
 
             val chartContainer = cardView.findViewById<android.view.ViewGroup>(R.id.chart_container)
 
-            // ✅ Buscar si ya existe un loading view
+            // Buscar si ya existe un loading view
             val existingLoading = chartContainer?.findViewWithTag<android.view.View>("loading_view")
 
             if (existingLoading == null) {

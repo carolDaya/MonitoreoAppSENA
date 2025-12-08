@@ -202,7 +202,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
     }
 
     // ----------------------------------------------------------
-    // 💡 Inicialización de Managers, Voz y Waveform
+    // Inicialización de Managers, Voz y Waveform
     // ----------------------------------------------------------
     private fun initializeManagers() {
         headerBinding = HeaderLayoutAdminBinding.bind(binding.mainHeader.root)
