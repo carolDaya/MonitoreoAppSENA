@@ -115,7 +115,7 @@
                     android:paddingEnd="@dimen/padding_input_start"
                     android:textColor="@color/white"
                     android:textCursorDrawable="@drawable/cursor_white"
-                    android:textSize="@dimen/text_size_lg"
+                    android:textSize="@dimen/text_size_l"
                     tools:ignore="VisualLintTextFieldSize" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -145,7 +145,7 @@
                     android:paddingStart="@dimen/padding_input_start"
                     android:paddingEnd="@dimen/padding_input_start"
                     android:textColor="@color/white"
-                    android:textSize="@dimen/text_size_lg"
+                    android:textSize="@dimen/text_size_l"
                     tools:ignore="VisualLintTextFieldSize" />
             </com.google.android.material.textfield.TextInputLayout>
 

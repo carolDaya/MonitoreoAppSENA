@@ -31,7 +31,6 @@ object RetrofitClient {
 
     // Cliente para SENSORES
     val apiSensores: ApiSensor by lazy { retrofitApi.create(ApiSensor::class.java) }
-
     // Cliente para LECTURAS
     val apiLecturas: ApiLectura by lazy { retrofitApi.create(ApiLectura::class.java) }
     val apiProceso: ApiProceso by lazy { retrofitApi.create(ApiProceso::class.java) }

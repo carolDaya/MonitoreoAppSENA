@@ -15,6 +15,7 @@ class VoiceManager(
         private const val TAG = "VoiceManager"
         private const val UTTERANCE_ID_PREFIX = "TTS_ID_"
         private const val SENTENCE_ID_PREFIX = "SENTENCE_"
+        private const val MIN_SENTENCE_LENGTH = 5  // ✅ NUEVO
     }
 
     private var tts: TextToSpeech? = null
@@ -24,7 +25,6 @@ class VoiceManager(
     var isSpeaking: Boolean = false
         private set
 
-    // Configuración
     var currentPitch: Float = 1.0f
     var currentGender: String = "FEMALE"
     var currentRate: Float = 1.0f
@@ -33,8 +33,10 @@ class VoiceManager(
     private val preferredFemaleVoices = listOf("female", "mujer", "femenino", "woman", "efb")
 
     private var onUtteranceCompleted: (() -> Unit)? = null
-    // ✅ NUEVO: Callback para notificar cuando el TTS realmente empieza a hablar
     private var onSpeechStarted: (() -> Unit)? = null
+
+    private var totalSentencesToSpeak = 0
+    private var sentencesSpoken = 0
 
     fun initialize() {
         tts = TextToSpeech(context, this)
@@ -45,9 +47,9 @@ class VoiceManager(
             isReady = true
             applyTtsSettings()
             onInitComplete?.invoke()
-            Log.d(TAG, "TTS inicializado correctamente")
+            Log.d(TAG, "✅ TTS inicializado correctamente")
         } else {
-            Log.e(TAG, "Error al inicializar TTS: $status")
+            Log.e(TAG, "❌ Error al inicializar TTS: $status")
         }
     }
 
@@ -55,68 +57,47 @@ class VoiceManager(
         this.onUtteranceCompleted = listener
     }
 
-    // ✅ NUEVO: Setter para el listener de inicio de voz
     fun setOnSpeechStartedListener(listener: () -> Unit) {
         this.onSpeechStarted = listener
     }
 
     fun applyTtsSettings() {
         if (tts == null || !isReady) {
-            Log.w(TAG, "TTS no está listo para aplicar settings")
+            Log.w(TAG, "⚠️ TTS no está listo")
             return
         }
-
-        Log.d(TAG, "🎯 Aplicando configuración: $currentGender, pitch: $currentPitch")
 
         val locale = Locale("es", "ES")
         val result = tts?.setLanguage(locale)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.e(TAG, "Idioma TTS no compatible")
+            Log.e(TAG, "❌ Idioma no soportado")
             return
         }
 
         when (currentGender.uppercase()) {
-            "MALE" -> {
-                setupMaleVoice(locale)
-                Log.d(TAG, "🔊 Voz masculina configurada")
-            }
-            "FEMALE" -> {
-                setupFemaleVoice(locale)
-                Log.d(TAG, "🔊 Voz femenina configurada")
-            }
-            "ROBOTIC" -> {
-                setupRoboticVoice()
-                Log.d(TAG, "🔊 Voz robótica configurada")
-            }
-            else -> {
-                setupFemaleVoice(locale)
-                Log.w(TAG, "⚠️ Género no reconocido, usando femenino por defecto")
-            }
+            "MALE" -> setupMaleVoice(locale)
+            "FEMALE" -> setupFemaleVoice(locale)
+            "ROBOTIC" -> setupRoboticVoice()
+            else -> setupFemaleVoice(locale)
         }
 
         tts?.setPitch(mapPitchValue(currentPitch))
         tts?.setSpeechRate(mapSpeechRateValue(currentRate))
-
         setupProgressListener()
-        Log.d(TAG, "✅ Configuración de voz aplicada exitosamente")
     }
 
     private fun setupMaleVoice(locale: Locale) {
         tts?.voices?.find {
             it.locale.language == locale.language &&
                     preferredMaleVoices.any { pref -> it.name.contains(pref, true) }
-        }?.let {
-            tts?.voice = it
-        }
+        }?.let { tts?.voice = it }
     }
 
     private fun setupFemaleVoice(locale: Locale) {
         tts?.voices?.find {
             it.locale.language == locale.language &&
                     preferredFemaleVoices.any { pref -> it.name.contains(pref, true) }
-        }?.let {
-            tts?.voice = it
-        }
+        }?.let { tts?.voice = it }
     }
 
     private fun setupRoboticVoice() {
@@ -127,58 +108,72 @@ class VoiceManager(
     }
 
     private fun mapPitchValue(value: Float): Float = value.coerceIn(0.5f, 2.0f)
-
     private fun mapSpeechRateValue(value: Float): Float = value.coerceIn(0.1f, 2.0f)
 
-
+    // ✅ MÉTODO OPTIMIZADO: Hablar texto corto inmediatamente
     fun speak(text: String) {
-        if (!isReady) {
-            Log.w(TAG, "TTS no está listo")
-            return
-        }
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "$UTTERANCE_ID_PREFIX${System.currentTimeMillis()}")
-    }
-
-    fun speakLongText(fullText: String, pauseBetweenSentences: Long = 800) {
-        speakWithPauses(fullText, pauseBetweenSentences)
-    }
-
-    private var totalSentencesToSpeak = 0
-    private var sentencesSpoken = 0
-
-    fun speakWithPauses(text: String, pauseBetweenSentences: Long = 500) {
         if (!isReady) {
             Log.w(TAG, "⚠️ TTS no está listo")
             return
         }
 
-        Log.d(TAG, "🔤 Texto recibido para dividir: $text")
+        val cleanText = normalizeText(text)
+        val utteranceId = "$UTTERANCE_ID_PREFIX${System.currentTimeMillis()}"
 
-        // Regex mejorado que NO divide en puntos decimales
-        val sentences = text
-            .split(Regex("(?<=[.!?])\\s+(?=[A-ZÁÉÍÓÚÑ])"))
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && it != "." }
+        Log.d(TAG, "🎤 Hablando texto corto: $cleanText")
+        tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+    }
 
-        Log.d(TAG, "📝 Oraciones detectadas: ${sentences.size}")
-        sentences.forEachIndexed { index, sentence ->
-            Log.d(TAG, "   [$index]: $sentence")
-        }
-
-        if (sentences.isEmpty()) {
-            Log.w(TAG, "⚠️ No se detectaron oraciones válidas")
+    // ✅ MÉTODO OPTIMIZADO: División inteligente de texto largo
+    fun speakLongText(fullText: String, pauseBetweenSentences: Long = 800) {
+        if (!isReady) {
+            Log.w(TAG, "⚠️ TTS no está listo")
             return
         }
 
-        // ✅ NUEVO: Resetear contadores
+        val normalizedText = normalizeText(fullText)
+        val sentences = splitIntoSentences(normalizedText)
+
+        Log.d(TAG, "📝 Dividido en ${sentences.size} oraciones")
+
+        // ✅ Si es texto corto, hablar directo
+        if (sentences.size <= 1 || normalizedText.length < 150) {
+            speak(normalizedText)
+            return
+        }
+
+        // ✅ Para textos largos, usar pausas
+        speakWithPauses(sentences, pauseBetweenSentences)
+    }
+
+    // ✅ NUEVO: Normalizar texto antes de hablar
+    private fun normalizeText(text: String): String {
+        return text
+            .replace("\\u00b0", " grados ")
+            .replace("°", " grados ")
+            .replace("|", " y ")
+            .replace(Regex("\\.{2,}"), ".")  // .. -> .
+            .replace(Regex("\\s+"), " ")      // Múltiples espacios -> 1
+            .trim()
+    }
+
+    // ✅ NUEVO: División mejorada de oraciones
+    private fun splitIntoSentences(text: String): List<String> {
+        // División simple y robusta
+        return text
+            .split(Regex("[.!?]+"))
+            .map { it.trim() }
+            .filter { it.length >= MIN_SENTENCE_LENGTH }
+            .also { sentences ->
+                sentences.forEachIndexed { i, s ->
+                    Log.d(TAG, "  [$i]: ${s.take(50)}${if (s.length > 50) "..." else ""}")
+                }
+            }
+    }
+
+    private fun speakWithPauses(sentences: List<String>, pauseBetweenSentences: Long) {
         totalSentencesToSpeak = sentences.size
         sentencesSpoken = 0
-        Log.d(TAG, "🎯 Preparando para reproducir $totalSentencesToSpeak oraciones")
-
-        if (sentences.size == 1) {
-            tts?.speak(sentences[0], TextToSpeech.QUEUE_FLUSH, null, "$SENTENCE_ID_PREFIX${System.currentTimeMillis()}")
-            return
-        }
 
         sentences.forEachIndexed { index, sentence ->
             val utteranceId = "$SENTENCE_ID_PREFIX$index"
@@ -194,42 +189,34 @@ class VoiceManager(
     private fun setupProgressListener() {
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
-                // ✅ MODIFICACIÓN CRÍTICA: Activar onSpeechStarted si NO estamos hablando
-                // (Esto cubre tanto el primer fragmento de un texto largo como un texto corto)
                 if (!isSpeaking) {
                     isSpeaking = true
                     onSpeechStarted?.invoke()
-                    Log.d(TAG, "🎤 TTS iniciado, animacion de waveform activada.")
-                }
-
-                // Lógica de seguimiento de oraciones para textos largos
-                if (utteranceId?.startsWith(SENTENCE_ID_PREFIX) == true) {
-                    val sentenceIndex = utteranceId.removePrefix(SENTENCE_ID_PREFIX).toIntOrNull()
-                    Log.d(TAG, "🎤 Oración #$sentenceIndex de un texto largo iniciada")
+                    Log.d(TAG, "▶️ TTS iniciado")
                 }
             }
 
             override fun onDone(utteranceId: String?) {
-                // ✅ NUEVO: Solo llamar al callback cuando TODAS las oraciones terminen
-                if (utteranceId?.startsWith(SENTENCE_ID_PREFIX) == true) {
-                    sentencesSpoken++
-                    Log.d(TAG, "✅ Oración completada: $sentencesSpoken/$totalSentencesToSpeak")
+                when {
+                    utteranceId?.startsWith(SENTENCE_ID_PREFIX) == true -> {
+                        sentencesSpoken++
+                        Log.d(TAG, "✅ Oración $sentencesSpoken/$totalSentencesToSpeak")
 
-                    if (sentencesSpoken >= totalSentencesToSpeak) {
+                        if (sentencesSpoken >= totalSentencesToSpeak) {
+                            isSpeaking = false
+                            onUtteranceCompleted?.invoke()
+                        }
+                    }
+                    else -> {
                         isSpeaking = false
-                        Log.d(TAG, "🎉 TODAS las oraciones completadas")
                         onUtteranceCompleted?.invoke()
                     }
-                } else {
-                    // Para utterances normales (no divididos en oraciones)
-                    isSpeaking = false
-                    onUtteranceCompleted?.invoke()
                 }
             }
 
             override fun onError(utteranceId: String?) {
                 isSpeaking = false
-                Log.e(TAG, "❌ Error en: $utteranceId")
+                Log.e(TAG, "❌ Error TTS: $utteranceId")
                 onUtteranceCompleted?.invoke()
             }
 
@@ -254,6 +241,6 @@ class VoiceManager(
         isReady = false
         isSpeaking = false
         onUtteranceCompleted = null
-        onSpeechStarted = null // Limpiar el nuevo listener también
+        onSpeechStarted = null
     }
 }

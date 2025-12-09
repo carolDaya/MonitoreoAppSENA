@@ -8,21 +8,21 @@
     android:background="@color/white"
     android:padding="24dp">
 
-    <androidx.core.widget.NestedScrollView
-        android:layout_width="0dp"
-        android:layout_height="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintWidth_percent="1.0"
-        android:fillViewport="true">
+        app:layout_constraintEnd_toEndOf="parent">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:layout_gravity="center">
+            android:gravity="center_horizontal">
 
             <com.airbnb.lottie.LottieAnimationView
                 android:id="@+id/lottieAnimation"
@@ -30,18 +30,17 @@
                 android:layout_height="180dp"
                 app:lottie_autoPlay="true"
                 app:lottie_loop="true"
-                app:lottie_rawRes="@raw/animation_connection" />
-
-            <TextView
-                android:id="@+id/tvTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:gravity="center"
-                android:text="¡Conexión Perdida!"
-                android:textColor="@color/red"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                app:lottie_rawRes="@raw/animation_connection"
+                tools:background="@color/material_on_surface_disabled" /> <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:text="¡Conexión Perdida!"
+            android:textColor="@color/red"
+            android:textSize="24sp"
+            android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvErrorMessage"
@@ -64,6 +63,7 @@
                 android:textSize="16sp"
                 app:backgroundTint="@color/red"
                 app:cornerRadius="28dp"
+                android:textColor="@color/white"
                 app:icon="@drawable/ic_refresh"
                 app:iconGravity="textStart"
                 app:iconPadding="8dp"
@@ -74,13 +74,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:padding="16dp"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="16dp"
                 android:text="Cerrar aplicación"
                 android:textColor="#666666"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"/> </LinearLayout>
 
-        </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
