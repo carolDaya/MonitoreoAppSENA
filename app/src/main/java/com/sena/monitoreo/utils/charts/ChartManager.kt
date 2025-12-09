@@ -29,30 +29,30 @@ class ChartManager(private val context: Context) {
         entries: List<Entry>,
         sensorId: Int
     ) {
-        Log.d("ChartManager", "🎨 displayChart INICIADO para $label")
+        Log.d("ChartManager", "displayChart INICIADO para $label")
 
         val titleTextView = cardView.findViewById<TextView>(R.id.card_title)
         titleTextView?.text = label
 
-        // ✅ Limpiar mensajes de carga/error previos
+        // Limpiar mensajes de carga/error previos
         val chartContainer = cardView.findViewById<ViewGroup>(R.id.chart_container)
         chartContainer?.findViewWithTag<View>("loading_view")?.let {
             chartContainer.removeView(it)
-            Log.d("ChartManager", "🗑️ Loading view removido")
+            Log.d("ChartManager", "Loading view removido")
         }
         chartContainer?.findViewWithTag<View>("no_data_message")?.let {
             chartContainer.removeView(it)
-            Log.d("ChartManager", "🗑️ No data message removido")
+            Log.d("ChartManager", "No data message removido")
         }
 
         val lineChart = cardView.findViewById<LineChart>(R.id.chart_line)
         val barChart = cardView.findViewById<BarChart>(R.id.chart_bar)
         val pieChart = cardView.findViewById<PieChart>(R.id.chart_pie)
 
-        Log.d("ChartManager", "🔍 Charts: Line=${lineChart != null}, Bar=${barChart != null}, Pie=${pieChart != null}")
+        Log.d("ChartManager", "Charts: Line=${lineChart != null}, Bar=${barChart != null}, Pie=${pieChart != null}")
 
         if (lineChart == null && barChart == null && pieChart == null) {
-            Log.e("ChartManager", "❌ CHARTS NO ENCONTRADOS EN EL LAYOUT")
+            Log.e("ChartManager", "CHARTS NO ENCONTRADOS EN EL LAYOUT")
             return
         }
 
@@ -65,28 +65,28 @@ class ChartManager(private val context: Context) {
 
         when (lowerChartType) {
             "line" -> {
-                Log.d("ChartManager", "📈 Mostrando LineChart")
+                Log.d("ChartManager", "Mostrando LineChart")
                 lineChart?.apply {
                     visibility = View.VISIBLE
                     setupLineChart(this, label, color, entries)
                 }
             }
             "bar" -> {
-                Log.d("ChartManager", "📊 Mostrando BarChart")
+                Log.d("ChartManager", "Mostrando BarChart")
                 barChart?.apply {
                     visibility = View.VISIBLE
                     setupBarChart(this, label, color, entries)
                 }
             }
             "pie" -> {
-                Log.d("ChartManager", "🥧 Mostrando PieChart")
+                Log.d("ChartManager", "Mostrando PieChart")
                 pieChart?.apply {
                     visibility = View.VISIBLE
                     setupPieChart(this, label, entries, sensorId)
                 }
             }
             else -> {
-                Log.w("ChartManager", "⚠️ Tipo desconocido, usando LINE")
+                Log.w("ChartManager", "Tipo desconocido, usando LINE")
                 lineChart?.apply {
                     visibility = View.VISIBLE
                     setupLineChart(this, label, color, entries)
@@ -94,10 +94,10 @@ class ChartManager(private val context: Context) {
             }
         }
 
-        Log.d("ChartManager", "✅ displayChart completado")
+        Log.d("ChartManager", "displayChart completado")
     }
 
-    // ✅ Método helper para debug
+    //Método helper para debug
     private fun printViewHierarchy(view: View, level: Int) {
         val indent = "  ".repeat(level)
         Log.d("ChartManager", "$indent- ${view::class.simpleName} (id: ${view.id})")

@@ -46,9 +46,6 @@ class HomeAdminActivity : BaseVoiceActivity() {
         enableEdgeToEdge()
         binding = ActivityHomeAdminBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
-
         setupNavigation()
         setupVoiceConfiguration()
         setupProcesoControl()
@@ -60,7 +57,6 @@ class HomeAdminActivity : BaseVoiceActivity() {
     }
 
     override fun onNetworkRetry() {
-        Log.d(TAG, "🔄 Reintentando carga en HomeAdmin...")
         lifecycleScope.launch {
             procesoViewModel.loadProcesoStatus()
             voiceConfigViewModel.loadCurrentConfig()
@@ -121,7 +117,6 @@ class HomeAdminActivity : BaseVoiceActivity() {
                         }
                     }
                     VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        // Éxito en la carga - no necesita acción específica
                     }
                     else -> {}
                 }
@@ -186,7 +181,6 @@ class HomeAdminActivity : BaseVoiceActivity() {
     }
 
     override fun onVoiceInitialized() {
-        Log.d(TAG, "🎙️ Voz inicializada en HomeAdmin")
 
         voiceConfigViewModel.currentConfig.value.let { config ->
             voiceManager.currentPitch = config.voicePitch.toFloat()

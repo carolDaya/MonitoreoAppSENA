@@ -83,7 +83,6 @@ class HomeUserActivity : BaseVoiceActivity() {
                     }
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
                         Log.e(TAG, "Error de Config. Voz: ${state.message}")
-                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
                         if (state.message.contains("Error de red", ignoreCase = true) ||
                             state.message.contains("IOException", ignoreCase = true)) {
                             showNetworkError(state.message)
@@ -130,7 +129,6 @@ class HomeUserActivity : BaseVoiceActivity() {
     override fun startSpeaking() {
         super.startSpeaking()
         val message = getString(R.string.welcome_message)
-        // ✅ USANDO EL MÉTODO DE BASE
         speakWithWaveform(message)
     }
 

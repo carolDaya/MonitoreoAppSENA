@@ -61,9 +61,7 @@ class NetworkErrorActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        // ✅ CORREGIDO: Llamar al super primero
         super.onBackPressed()
-        // Luego nuestra animación personalizada
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
     }
 }

@@ -81,7 +81,6 @@ class NavigationManager(
             }
             R.id.nav_datos_gas -> {
                 if (currentActivity == "sensor_data") {
-                    // 💡 CORRECCIÓN: Llamada directa al método público
                     val sensorActivity = context as? SensorDataActivity
                     sensorActivity?.navigateToCard("GAS")
                 } else {

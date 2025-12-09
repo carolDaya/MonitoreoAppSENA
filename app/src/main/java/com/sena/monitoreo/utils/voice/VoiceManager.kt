@@ -15,7 +15,7 @@ class VoiceManager(
         private const val TAG = "VoiceManager"
         private const val UTTERANCE_ID_PREFIX = "TTS_ID_"
         private const val SENTENCE_ID_PREFIX = "SENTENCE_"
-        private const val MIN_SENTENCE_LENGTH = 5  // ✅ NUEVO
+        private const val MIN_SENTENCE_LENGTH = 5
     }
 
     private var tts: TextToSpeech? = null
@@ -47,9 +47,9 @@ class VoiceManager(
             isReady = true
             applyTtsSettings()
             onInitComplete?.invoke()
-            Log.d(TAG, "✅ TTS inicializado correctamente")
+            Log.d(TAG, "TTS inicializado correctamente")
         } else {
-            Log.e(TAG, "❌ Error al inicializar TTS: $status")
+            Log.e(TAG, "Error al inicializar TTS: $status")
         }
     }
 
@@ -63,14 +63,14 @@ class VoiceManager(
 
     fun applyTtsSettings() {
         if (tts == null || !isReady) {
-            Log.w(TAG, "⚠️ TTS no está listo")
+            Log.w(TAG, "TTS no está listo")
             return
         }
 
         val locale = Locale("es", "ES")
         val result = tts?.setLanguage(locale)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.e(TAG, "❌ Idioma no soportado")
+            Log.e(TAG, "Idioma no soportado")
             return
         }
 
@@ -110,10 +110,10 @@ class VoiceManager(
     private fun mapPitchValue(value: Float): Float = value.coerceIn(0.5f, 2.0f)
     private fun mapSpeechRateValue(value: Float): Float = value.coerceIn(0.1f, 2.0f)
 
-    // ✅ MÉTODO OPTIMIZADO: Hablar texto corto inmediatamente
+    // MÉTODO OPTIMIZADO: Hablar texto corto inmediatamente
     fun speak(text: String) {
         if (!isReady) {
-            Log.w(TAG, "⚠️ TTS no está listo")
+            Log.w(TAG, "TTS no está listo")
             return
         }
 
@@ -124,29 +124,29 @@ class VoiceManager(
         tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
 
-    // ✅ MÉTODO OPTIMIZADO: División inteligente de texto largo
+    // División inteligente de texto largo
     fun speakLongText(fullText: String, pauseBetweenSentences: Long = 800) {
         if (!isReady) {
-            Log.w(TAG, "⚠️ TTS no está listo")
+            Log.w(TAG, "TTS no está listo")
             return
         }
 
         val normalizedText = normalizeText(fullText)
         val sentences = splitIntoSentences(normalizedText)
 
-        Log.d(TAG, "📝 Dividido en ${sentences.size} oraciones")
+        Log.d(TAG, "Dividido en ${sentences.size} oraciones")
 
-        // ✅ Si es texto corto, hablar directo
+        // Si es texto corto, hablar directo
         if (sentences.size <= 1 || normalizedText.length < 150) {
             speak(normalizedText)
             return
         }
 
-        // ✅ Para textos largos, usar pausas
+        // Para textos largos, usar pausas
         speakWithPauses(sentences, pauseBetweenSentences)
     }
 
-    // ✅ NUEVO: Normalizar texto antes de hablar
+    // Normalizar texto antes de hablar
     private fun normalizeText(text: String): String {
         return text
             .replace("\\u00b0", " grados ")
@@ -157,7 +157,7 @@ class VoiceManager(
             .trim()
     }
 
-    // ✅ NUEVO: División mejorada de oraciones
+    //  División mejorada de oraciones
     private fun splitIntoSentences(text: String): List<String> {
         // División simple y robusta
         return text
@@ -192,7 +192,7 @@ class VoiceManager(
                 if (!isSpeaking) {
                     isSpeaking = true
                     onSpeechStarted?.invoke()
-                    Log.d(TAG, "▶️ TTS iniciado")
+                    Log.d(TAG, "TTS iniciado")
                 }
             }
 
@@ -200,7 +200,7 @@ class VoiceManager(
                 when {
                     utteranceId?.startsWith(SENTENCE_ID_PREFIX) == true -> {
                         sentencesSpoken++
-                        Log.d(TAG, "✅ Oración $sentencesSpoken/$totalSentencesToSpeak")
+                        Log.d(TAG, "Oración $sentencesSpoken/$totalSentencesToSpeak")
 
                         if (sentencesSpoken >= totalSentencesToSpeak) {
                             isSpeaking = false
@@ -216,7 +216,7 @@ class VoiceManager(
 
             override fun onError(utteranceId: String?) {
                 isSpeaking = false
-                Log.e(TAG, "❌ Error TTS: $utteranceId")
+                Log.e(TAG, "Error TTS: $utteranceId")
                 onUtteranceCompleted?.invoke()
             }
 

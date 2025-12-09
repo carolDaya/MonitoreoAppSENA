@@ -23,7 +23,7 @@ class SignupViewModel(
         phone: String,
         password: String,
         confirmPassword: String,
-        getString: (Int) -> String // <-- Función para obtener strings desde el ViewModel (requiere Context/Application o inyección)
+        getString: (Int) -> String
     ) {
         // Validación en el ViewModel
         if (!isFormValid(name, phone, password, confirmPassword, getString)) return

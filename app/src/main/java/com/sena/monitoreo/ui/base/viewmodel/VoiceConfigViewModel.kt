@@ -24,7 +24,6 @@ class VoiceConfigViewModel(
         data object Idle : VoiceConfigUiState
         data object Loading : VoiceConfigUiState
         data object Success : VoiceConfigUiState
-        // 💡 CLAVE: Incluir la clase Error para pasar el mensaje
         data class Error(val message: String) : VoiceConfigUiState
     }
 
@@ -43,26 +42,25 @@ class VoiceConfigViewModel(
 
     fun loadCurrentConfig() {
         _isLoading.value = true
-        _uiState.value = VoiceConfigUiState.Loading // 💡 Actualizar estado de UI a Loading
-
+        _uiState.value = VoiceConfigUiState.Loading
         viewModelScope.launch {
             try {
                 when (val result = voiceRepository.getVoiceConfig()) {
                     is ResultWrapper.Success -> {
                         _currentConfig.value = result.data
-                        _uiState.value = VoiceConfigUiState.Success // 💡 Éxito
+                        _uiState.value = VoiceConfigUiState.Success
                     }
                     is ResultWrapper.Error -> {
                         // Si es un error de servidor o lógico, lo reportamos al UI
-                        _uiState.value = VoiceConfigUiState.Error(result.message) // 💡 Error lógico
+                        _uiState.value = VoiceConfigUiState.Error(result.message)
                     }
                 }
             } catch (e: IOException) {
                 // Error de red (Timeouts, no connection, etc.)
-                _uiState.value = VoiceConfigUiState.Error("Error de red: No se pudo conectar al servidor.") // 💡 Error de red
+                _uiState.value = VoiceConfigUiState.Error("Error de red: No se pudo conectar al servidor.")
             } catch (e: Exception) {
                 // Error inesperado
-                _uiState.value = VoiceConfigUiState.Error("Error inesperado al cargar la configuración: ${e.message}") // 💡 Error inesperado
+                _uiState.value = VoiceConfigUiState.Error("Error inesperado al cargar la configuración: ${e.message}")
             } finally {
                 _isLoading.value = false
             }

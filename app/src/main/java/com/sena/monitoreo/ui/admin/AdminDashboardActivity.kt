@@ -74,7 +74,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
     }
 
     // ----------------------------------------------------------
-    // 📌 Variable y Constantes para el mensaje de voz por sección
+    // Variable y Constantes para el mensaje de voz por sección
     // ----------------------------------------------------------
     private var currentSectionMessage: String = ""
 
@@ -102,15 +102,12 @@ class AdminDashboardActivity : BaseVoiceActivity() {
         observeNetworkErrors()
 
         handleScrollToSection()
-
-        // ❌ ELIMINADO: Se quita la llamada automática a startSpeaking() aquí.
     }
 
     // ----------------------------------------------------------
-    // 💡 Implementación de NetworkRetryListener (Heredado de BaseActivity)
+    // Implementación de NetworkRetryListener (Heredado de BaseActivity)
     // ----------------------------------------------------------
     override fun onNetworkRetry() {
-        Log.d(TAG, "🔄 Reintentando conexión desde NetworkErrorActivity...")
 
         chartManager.loadInitialCharts(
             binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp,
@@ -130,9 +127,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
         }
     }
 
-    // ----------------------------------------------------------
-    // ⚠️ Observar errores de red de ViewModels
-    // ----------------------------------------------------------
     private fun observeNetworkErrors() {
         lifecycleScope.launch {
             // Observar errores de UserViewModel
@@ -174,10 +168,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             }
         }
     }
-
-    // ----------------------------------------------------------
-    // 🔄 Observar estados de carga (Loading)
-    // ----------------------------------------------------------
+    // Observar estados de carga (Loading)
     private fun observeLoadingStates() {
         adminConfigViewModel.isLoading.observe(this) { isLoading ->
             if (isLoading) {
@@ -205,10 +196,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             }
         }
     }
-
-    // ----------------------------------------------------------
     // Inicialización de Managers, Voz y Waveform
-    // ----------------------------------------------------------
     private fun initializeManagers() {
         headerBinding = HeaderLayoutAdminBinding.bind(binding.mainHeader.root)
         val waveFormSection = headerBinding.waveformSection.root
@@ -228,7 +216,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             lifecycleOwner = this
         )
 
-        // ✅ LÓGICA CORRECTA: Reproducirá solo al hacer clic en el botón.
         btnPlayMessage.setOnClickListener {
             if (!voiceManager.isSpeaking) {
                 startSpeaking() // Reproduce currentSectionMessage
@@ -237,10 +224,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
             }
         }
     }
-
-    // ----------------------------------------------------------
-    // 🔊 Reproducción de Mensaje de Voz Específico (Sobreescrito)
-    // ----------------------------------------------------------
+    // Reproducción de Mensaje de Voz Específico (Sobreescrito)
     override fun startSpeaking() {
         // La configuración de TTS ya se aplica en onVoiceInitialized y al cambiar en el helper
         super.startSpeaking()
@@ -261,19 +245,14 @@ class AdminDashboardActivity : BaseVoiceActivity() {
         adminConfigViewModel.saveSuccess.observe(this) {}
     }
 
-    // ----------------------------------------------------------
-    // ⚙️ Configuración de Voz (Usando VoiceConfigHelper y UiUtils)
-    // ----------------------------------------------------------
+    // Configuración de Voz (Usando VoiceConfigHelper y UiUtils)
     private fun setupVoiceConfigurationSection() {
         voiceConfigHelper.setup(
             binding.iaAdminSection.spinnerIaVoz,
             binding.iaAdminSection.spinnerTonoVoz
         )
     }
-
-    // ----------------------------------------------------------
-    // 👥 Lógica de Usuarios (Corregida la Carga Inicial)
-    // ----------------------------------------------------------
+    // Lógica de Usuarios (Corregida la Carga Inicial)
     private fun setupUserSection() {
         setupRecyclerView()
         setupTabs()
@@ -336,7 +315,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
     }
 
     // ----------------------------------------------------------
-    // 📊 Lógica de Gráficas (Usando AdminChartManager)
+    // Lógica de Gráficas (Usando AdminChartManager)
     // ----------------------------------------------------------
     @RequiresApi(Build.VERSION_CODES.M)
     private fun setupChartSection() {
@@ -358,7 +337,7 @@ class AdminDashboardActivity : BaseVoiceActivity() {
     }
 
     // ----------------------------------------------------------
-    // 🧭 Lógica de Navegación (Solo cambia mensaje, NO habla automáticamente)
+    // Lógica de Navegación (Solo cambia mensaje, NO habla automáticamente)
     // ----------------------------------------------------------
     private fun setupNavigationDrawer() {
         headerBinding = HeaderLayoutAdminBinding.bind(binding.mainHeader.root)
@@ -406,7 +385,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
 
     /**
      * Controla la visibilidad de las secciones y define el mensaje de voz actual.
-     * ❌ Eliminada la llamada a startSpeaking() al final.
      */
     private fun showSection(home: Boolean = false, graphs: Boolean = false, ai: Boolean = false, users: Boolean = false) {
         with(binding) {
@@ -445,7 +423,6 @@ class AdminDashboardActivity : BaseVoiceActivity() {
                 stopSpeaking()
             }
 
-            // 4. ❌ IMPORTANTE: NO LLAMAR startSpeaking() aquí. Se deja al clic.
         }
     }
 

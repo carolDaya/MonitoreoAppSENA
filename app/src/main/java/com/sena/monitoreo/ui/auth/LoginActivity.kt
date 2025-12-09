@@ -38,8 +38,6 @@ class LoginActivity : BaseActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
-
         setupWindowInsets()
         setupInputWatcher()
         setupListeners()
@@ -157,7 +155,7 @@ class LoginActivity : BaseActivity() {
                     is LoginUiState.Error -> {
                         UiUtils.hideLoading()
 
-                        // 💡 NUEVO ENFOQUE: Usar NetworkErrorActivity para errores de red
+                        //  Usar NetworkErrorActivity para errores de red
                         if (state.message.contains("Error de red", ignoreCase = true)) {
                             showNetworkError("Problema de conexión. Verifica tu internet e intenta nuevamente.")
                         } else {

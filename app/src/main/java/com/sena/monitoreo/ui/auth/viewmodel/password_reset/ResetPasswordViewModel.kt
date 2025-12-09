@@ -51,7 +51,6 @@ class ResetPasswordViewModel(
 
     /**
      * Valida la longitud y coincidencia de las contraseñas.
-     * 💡 CORRECCIÓN: Ahora establece ResetPasswordUiState.Error directamente y retorna false si falla.
      */
     private fun isInputValid(newPass: String, confirmPass: String): Boolean {
         if (newPass.length < 6) {

@@ -16,11 +16,8 @@ class UserViewModel(private val repository: UserRepository) : ViewModel() {
 
     private val _users = MutableStateFlow<List<UserResponse>>(emptyList())
     val users: StateFlow<List<UserResponse>> = _users.asStateFlow()
-
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
-    // 💡 Nuevo StateFlow para errores de red
     private val _networkError = MutableStateFlow<String?>(null)
     val networkError: StateFlow<String?> = _networkError.asStateFlow()
 
@@ -49,13 +46,12 @@ class UserViewModel(private val repository: UserRepository) : ViewModel() {
                 } else if (resultWrapper is ResultWrapper.Error) {
                     Log.e(TAG, "Error al cargar usuarios por estado ($estado): ${resultWrapper.message}")
                     _users.value = emptyList()
-                    // No reportamos error de red aquí a menos que sea una IOException
                 }
 
             } catch (e: IOException) {
                 val errorMessage = "Error de red al cargar usuarios: No se pudo conectar al servidor."
                 Log.e(TAG, errorMessage, e)
-                _networkError.value = errorMessage // 💡 Reportar error de red
+                _networkError.value = errorMessage
                 _users.value = emptyList()
             } catch (e: Exception) {
                 Log.e(TAG, "Error inesperado al cargar usuarios: ${e.message}", e)
@@ -83,13 +79,12 @@ class UserViewModel(private val repository: UserRepository) : ViewModel() {
 
                 } else if (resultWrapper is ResultWrapper.Error) {
                     Log.e(TAG, "Error al actualizar estado del usuario $userId: ${resultWrapper.message}")
-                    // No reportamos error de red aquí a menos que sea una IOException
                 }
 
             } catch (e: IOException) {
                 val errorMessage = "Error de red: No se pudo actualizar el estado del usuario $userId."
                 Log.e(TAG, errorMessage, e)
-                _networkError.value = errorMessage // 💡 Reportar error de red
+                _networkError.value = errorMessage
             } catch (e: Exception) {
                 Log.e(TAG, "Error inesperado al actualizar estado del usuario $userId: ${e.message}")
             } finally {
@@ -98,7 +93,7 @@ class UserViewModel(private val repository: UserRepository) : ViewModel() {
         }
     }
 
-    // 💡 Función para que la actividad limpie el error después de mostrarlo
+    // Función para que la actividad limpie el error después de mostrarlo
     fun clearNetworkError() {
         _networkError.value = null
     }

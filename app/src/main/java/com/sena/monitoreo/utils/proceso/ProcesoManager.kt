@@ -50,7 +50,7 @@ class ProcesoManager(
             updateLoadingState(isLoading ?: false)
         }
 
-        // 💡 CORRECCIÓN: Observar estado del proceso con nombre único
+        //  Observar estado del proceso con nombre único
         procesoViewModel.isProcesoActivo.observe(lifecycleOwner) { isActive ->
             handleProcesoStateChange(isActive)
         }
@@ -69,13 +69,13 @@ class ProcesoManager(
     }
 
     /**
-     * 💡 CORRECCIÓN: Función renombrada para evitar conflicto
+     *  Función renombrada para evitar conflicto
      */
     private fun handleProcesoStateChange(isActive: Boolean?) {
         val activo = isActive ?: false
         val isLoading = procesoViewModel.isLoading.value ?: false
 
-        Log.d(TAG, "🔄 Actualizando UI del proceso. Activo: $activo, Loading: $isLoading")
+        Log.d(TAG, "Actualizando UI del proceso. Activo: $activo, Loading: $isLoading")
 
         // Actualizar visibilidad de botones
         if (activo) {
@@ -99,7 +99,7 @@ class ProcesoManager(
         val mensajeLimpio = message.trim()
 
         if (mensajeLimpio.isNotEmpty() && mensajeLimpio != "(mensaje vacío)") {
-            Log.d(TAG, "✅ Mensaje de estado: $mensajeLimpio")
+            Log.d(TAG, "Mensaje de estado: $mensajeLimpio")
 
             // Actualizar estado del TextView si el mensaje es informativo
             if (mensajeLimpio.contains("Error", ignoreCase = true) ||
@@ -110,7 +110,7 @@ class ProcesoManager(
 
             onStatusUpdate(mensajeLimpio)
         } else {
-            Log.d(TAG, "⏭️ Mensaje vacío omitido: '$message'")
+            Log.d(TAG, "Mensaje vacío omitido: '$message'")
         }
     }
 
@@ -119,7 +119,7 @@ class ProcesoManager(
      */
     private fun mostrarDialogoConfirmacionFinalizar() {
         AlertDialog.Builder(context)
-            .setTitle("⚠️ Confirmar Finalización")
+            .setTitle("Confirmar Finalización")
             .setMessage("¿Estás seguro de que deseas finalizar el proceso de monitoreo?")
             .setPositiveButton("Sí, Finalizar") { dialog, _ ->
                 Log.d(TAG, "Usuario confirmó finalización de proceso")

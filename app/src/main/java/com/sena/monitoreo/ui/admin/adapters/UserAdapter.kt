@@ -31,7 +31,7 @@ class UserAdapter(
         val user = userList[position]
         holder.txtNombre.text = user.nombre
 
-        // ✅ Mostrar ícono según estado
+        //  Mostrar ícono según estado
         val iconRes = when (user.estado?.lowercase()) {
             "activo" -> R.drawable.ic_admin_active_user
             "bloqueado" -> R.drawable.ic_admin_blocked_user
@@ -39,7 +39,7 @@ class UserAdapter(
         }
         holder.imgEstado.setImageResource(iconRes)
 
-        // ✅ Acción al pulsar el botón "Ver"
+        //  Acción al pulsar el botón "Ver"
         holder.btnVer.setOnClickListener {
             onViewClick(user)
         }
@@ -47,7 +47,7 @@ class UserAdapter(
 
     override fun getItemCount(): Int = userList.size
 
-    // ✅ Método para actualizar la lista
+    // Método para actualizar la lista
     fun updateList(newList: List<UserResponse>) {
         userList = newList
         notifyDataSetChanged()

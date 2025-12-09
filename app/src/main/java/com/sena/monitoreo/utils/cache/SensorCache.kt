@@ -23,10 +23,10 @@ object SensorCache {
         val age = System.currentTimeMillis() - cached.timestamp
 
         return if (age < CACHE_DURATION) {
-            Log.d(TAG, "✅ Cache HIT para sensor $sensorId (edad: ${age}ms)")
+            Log.d(TAG, "Cache HIT para sensor $sensorId (edad: ${age}ms)")
             cached.lecturas
         } else {
-            Log.d(TAG, "⏰ Cache EXPIRED para sensor $sensorId (edad: ${age}ms)")
+            Log.d(TAG, "Cache EXPIRED para sensor $sensorId (edad: ${age}ms)")
             cache.remove(sensorId)
             null
         }
@@ -37,7 +37,7 @@ object SensorCache {
      */
     fun put(sensorId: Int, lecturas: List<LecturaResponse>) {
         cache[sensorId] = CachedData(lecturas)
-        Log.d(TAG, "💾 Cache SAVED para sensor $sensorId (${lecturas.size} lecturas)")
+        Log.d(TAG, "Cache SAVED para sensor $sensorId (${lecturas.size} lecturas)")
     }
 
     /**
@@ -45,7 +45,7 @@ object SensorCache {
      */
     fun invalidate(sensorId: Int) {
         cache.remove(sensorId)
-        Log.d(TAG, "🗑️ Cache INVALIDATED para sensor $sensorId")
+        Log.d(TAG, "🗑Cache INVALIDATED para sensor $sensorId")
     }
 
     /**
@@ -53,7 +53,7 @@ object SensorCache {
      */
     fun clear() {
         cache.clear()
-        Log.d(TAG, "🗑️ Cache CLEARED")
+        Log.d(TAG, "Cache CLEARED")
     }
 
     /**

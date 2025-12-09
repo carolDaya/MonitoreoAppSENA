@@ -14,7 +14,6 @@ class AdminConfigViewModel(private val repository: VoiceRepository) : ViewModel(
 
     private val _currentConfig = MutableLiveData<VoiceConfigResponse>()
     val currentConfig: LiveData<VoiceConfigResponse> = _currentConfig
-
     private val _saveStatus = MutableLiveData<String>()
     val saveStatus: LiveData<String> = _saveStatus
 
@@ -24,7 +23,7 @@ class AdminConfigViewModel(private val repository: VoiceRepository) : ViewModel(
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
 
-    // 💡 Nuevo LiveData para errores de carga inicial
+    // LiveData para errores de carga inicial
     private val _loadError = MutableLiveData<String>()
     val loadError: LiveData<String> = _loadError
 

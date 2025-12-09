@@ -45,9 +45,6 @@ class AlertsActivity : BaseVoiceActivity() {
         binding = ActivityAlertsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // ✅ ELIMINADO: setupNetworkErrorHandling - ya no se necesita
-
-        // Ajustar insets del sistema
         ViewCompat.setOnApplyWindowInsetsListener(binding.alertaLayout) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -100,7 +97,7 @@ class AlertsActivity : BaseVoiceActivity() {
         // 2. Observar cambios de configuración de manera CENTRALIZADA
         lifecycleScope.launch {
             voiceConfigViewModel.currentConfig.collectLatest { config ->
-                Log.d(TAG, "🔄 Nueva configuración de voz recibida: ${config.voiceGender}, pitch: ${config.voicePitch}")
+                Log.d(TAG, "Nueva configuración de voz recibida: ${config.voiceGender}, pitch: ${config.voicePitch}")
 
                 // Aplicar configuración inmediatamente
                 voiceManager.currentPitch = config.voicePitch.toFloat()
@@ -109,7 +106,7 @@ class AlertsActivity : BaseVoiceActivity() {
                 // Forzar re-aplicación de settings si TTS ya está inicializado
                 if (isVoiceInitialized) {
                     voiceManager.applyTtsSettings()
-                    Log.d(TAG, "✅ Configuración de voz aplicada: ${config.voiceGender}")
+                    Log.d(TAG, "Configuración de voz aplicada: ${config.voiceGender}")
                 }
             }
         }
@@ -120,7 +117,6 @@ class AlertsActivity : BaseVoiceActivity() {
                 when (state) {
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
                         Log.e(TAG, "Error de Config. Voz: ${state.message}")
-                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
                         if (state.message.contains("Error de red", ignoreCase = true) ||
                             state.message.contains("IOException", ignoreCase = true)) {
                             showNetworkError(state.message)
@@ -130,7 +126,6 @@ class AlertsActivity : BaseVoiceActivity() {
                         }
                     }
                     VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        // Éxito en la carga - no necesita acción específica
                     }
                     else -> {}
                 }
@@ -181,7 +176,6 @@ class AlertsActivity : BaseVoiceActivity() {
                     is ResultWrapper.Error -> {
                         val errorMsg = analisisResult.message ?: "Error desconocido"
                         handleError(errorMsg)
-                        // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
                         if (errorMsg.contains("Error de red", ignoreCase = true) ||
                             errorMsg.contains("IOException", ignoreCase = true)) {
                             showNetworkError(errorMsg)
@@ -191,7 +185,6 @@ class AlertsActivity : BaseVoiceActivity() {
             } catch (e: Exception) {
                 val errorMsg = "Error inesperado: ${e.message}"
                 handleError(errorMsg)
-                // 💡 NUEVO ENFOQUE: Usar showNetworkError para errores de red
                 if (errorMsg.contains("Error de red", ignoreCase = true) ||
                     errorMsg.contains("IOException", ignoreCase = true)) {
                     showNetworkError(errorMsg)
@@ -209,7 +202,6 @@ class AlertsActivity : BaseVoiceActivity() {
         val tipoAlerta = analisis.tipo_alerta_modelo ?: "Alerta general"
         val recomendacion = analisis.recomendacion ?: "Sin recomendaciones"
 
-        // 📝 Mostrar en la interfaz (TextView)
         val displayText = buildString {
             appendLine("-$tipoEstado")
             appendLine()
@@ -221,10 +213,9 @@ class AlertsActivity : BaseVoiceActivity() {
 
         binding.iaResponseText.text = displayText
 
-        // 🔊 Mensaje para reproducir por voz - USANDO MÉTODO DE LA CLASE BASE
         fullAlertMessage = formatAnalysisMessage(analisis)
 
-        Log.d(TAG, "✅ Alerta cargada: $tipoEstado")
+        Log.d(TAG, "Alerta cargada: $tipoEstado")
 
         // Reproducir automáticamente cuando la voz esté lista
         if (isVoiceReady()) {
@@ -236,11 +227,11 @@ class AlertsActivity : BaseVoiceActivity() {
         val fallbackMessage = "No hay alertas activas en este momento"
         binding.iaResponseText.text = fallbackMessage
         fullAlertMessage = fallbackMessage
-        Log.w(TAG, "⚠️ Backend OK, pero no se detectó alerta activa")
+        Log.w(TAG, "Backend OK, pero no se detectó alerta activa")
     }
 
     private fun handleError(errorMessage: String) {
-        Log.e(TAG, "❌ Error al cargar alerta: $errorMessage")
+        Log.e(TAG, "Error al cargar alerta: $errorMessage")
         runOnUiThread {
             binding.iaResponseText.text = errorMessage
             fullAlertMessage = errorMessage
@@ -263,7 +254,7 @@ class AlertsActivity : BaseVoiceActivity() {
                 voiceManager.currentPitch = config.voicePitch.toFloat()
                 voiceManager.currentGender = config.voiceGender
                 voiceManager.applyTtsSettings()
-                Log.d(TAG, "🎯 Configuración sincronizada en onVoiceInitialized: ${config.voiceGender}")
+                Log.d(TAG, "Configuración sincronizada en onVoiceInitialized: ${config.voiceGender}")
             }
 
             // Solo entonces reproducir si hay mensaje
@@ -287,7 +278,7 @@ class AlertsActivity : BaseVoiceActivity() {
             if (voiceManager.currentGender != config.voiceGender ||
                 voiceManager.currentPitch != config.voicePitch.toFloat()) {
 
-                Log.w(TAG, "⚠️ Configuración desincronizada, re-aplicando...")
+                Log.w(TAG, "Configuración desincronizada, re-aplicando...")
                 voiceManager.currentPitch = config.voicePitch.toFloat()
                 voiceManager.currentGender = config.voiceGender
                 voiceManager.applyTtsSettings()
@@ -298,13 +289,11 @@ class AlertsActivity : BaseVoiceActivity() {
 
         if (alertData != null) {
             val fullMessage = formatAnalysisMessage(alertData!!)
-            // ✅ CORREGIDO: Usar el método con pausas para texto largo
             speakWithPausesAndWaveform(fullMessage)
-            Log.d(TAG, "🔊 Reproduciendo mensaje largo con waveform continuo: ${fullMessage.length} caracteres")
+            Log.d(TAG, "Reproduciendo mensaje largo con waveform continuo: ${fullMessage.length} caracteres")
         } else if (fullAlertMessage.isNotEmpty()) {
-            // ✅ CORREGIDO: Usar el método con pausas para texto largo
             speakWithPausesAndWaveform(fullAlertMessage)
-            Log.d(TAG, "🔊 Reproduciendo mensaje del intent con waveform continuo: ${fullAlertMessage.length} caracteres")
+            Log.d(TAG, "Reproduciendo mensaje del intent con waveform continuo: ${fullAlertMessage.length} caracteres")
         }
     }
 

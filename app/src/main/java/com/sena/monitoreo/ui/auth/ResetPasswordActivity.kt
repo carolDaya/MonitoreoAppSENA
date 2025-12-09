@@ -103,7 +103,6 @@ class ResetPasswordActivity : BaseActivity() {
             val newPass = inputNewPassword.text.toString().trim()
             val confirmPass = inputConfirmPassword.text.toString().trim()
 
-            // ✅ VALIDACIÓN LOCAL SIMPLE
             when {
                 newPass.isEmpty() || confirmPass.isEmpty() -> {
                     UiUtils.showSnackbar(containerView, "Por favor, completa ambos campos", isError = true)
@@ -115,7 +114,6 @@ class ResetPasswordActivity : BaseActivity() {
                     layoutConfirmPassword.error = "Las contraseñas no coinciden"
                 }
                 else -> {
-                    // ✅ TODO VALIDADO - Llamar al ViewModel
                     viewModel.updatePassword(phoneNumber, newPass, confirmPass)
                 }
             }

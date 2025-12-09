@@ -93,7 +93,7 @@ class SignupActivity : BaseActivity() {
                     is SignupUiState.Error -> {
                         UiUtils.hideLoading()
 
-                        // 💡 NUEVO ENFOQUE: Usar NetworkErrorActivity para errores de red
+                        // Usar NetworkErrorActivity para errores de red
                         if (state.message.contains("Error de red", ignoreCase = true) ||
                             state.message.contains("IOException", ignoreCase = true)) {
                             showNetworkError(state.message)

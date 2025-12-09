@@ -35,7 +35,7 @@ class AlertManager(
     fun startPeriodicAlertCheck(scope: LifecycleCoroutineScope) {
         alertCheckJob = scope.launch {
             while (true) {
-                Log.d(TAG, "🔄 Verificación periódica de alertas...")
+                Log.d(TAG, "Verificación periódica de alertas...")
                 checkAndHandleAlert()
                 delay(ALERT_CHECK_INTERVAL)
             }
@@ -48,7 +48,7 @@ class AlertManager(
     fun stopPeriodicAlertCheck() {
         alertCheckJob?.cancel()
         alertCheckJob = null
-        Log.d(TAG, "❌ Verificación periódica de alertas detenida.")
+        Log.d(TAG, "Verificación periódica de alertas detenida.")
     }
 
     /**
@@ -65,7 +65,7 @@ class AlertManager(
         val shouldCheck = lastAlertTimeMillis == 0L || hoursSinceLastAlert >= ALERT_COOLDOWN_HOURS
 
         if (shouldCheck) {
-            Log.d(TAG, "✅ Consultando backend para análisis...")
+            Log.d(TAG, "Consultando backend para análisis...")
 
             when (val analisisResult = analisisRepo.analizarLectura()) {
                 is ResultWrapper.Success -> {
@@ -73,25 +73,25 @@ class AlertManager(
 
                     // Verificar si la IA detectó una alerta (asumiendo 1 = Alerta activa)
                     if (analisis.alerta_ia == 1) {
-                        Log.d(TAG, "⚠️ Alerta activa detectada: ${analisis.mensaje_lectura}")
+                        Log.d(TAG, "Alerta activa detectada: ${analisis.mensaje_lectura}")
 
                         // Guardar el tiempo para iniciar el cooldown
                         prefs.edit().putLong(KEY_LAST_ALERT_TIME, currentTimeMillis).apply()
                         onAlertDetected(analisis.mensaje_lectura)
                     } else {
-                        Log.d(TAG, "✅ Sistema normal. Sin alertas activas.")
+                        Log.d(TAG, "Sistema normal. Sin alertas activas.")
                     }
                 }
                 is ResultWrapper.Error -> {
                     // Usar la jerarquía de ApiException para determinar el tipo de error
                     val errorType = if (analisisResult.exception is NetworkError) "RED/DESCONEXIÓN" else "API"
-                    Log.e(TAG, "❌ Error de $errorType: ${analisisResult.message}")
+                    Log.e(TAG, "Error de $errorType: ${analisisResult.message}")
                     onError(analisisResult.message)
                 }
             }
         } else {
             val remainingHours = ALERT_COOLDOWN_HOURS - hoursSinceLastAlert
-            Log.d(TAG, "⏸️ Cooldown activo. Faltan ${"%.2f".format(remainingHours)} horas.")
+            Log.d(TAG, "Cooldown activo. Faltan ${"%.2f".format(remainingHours)} horas.")
         }
     }
 
@@ -100,7 +100,7 @@ class AlertManager(
      */
     fun resetCooldown() {
         prefs.edit().remove(KEY_LAST_ALERT_TIME).apply()
-        Log.d(TAG, "🧪 Cooldown reseteado")
+        Log.d(TAG, "Cooldown reseteado")
     }
 
     /**

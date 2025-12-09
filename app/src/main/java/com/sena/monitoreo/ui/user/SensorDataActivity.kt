@@ -69,7 +69,7 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         fun clearCache() {
             cachedConfiguraciones = null
-            cachedAnalisis = null // ✅ Limpiar también el análisis
+            cachedAnalisis = null
             lastConfigLoadTime = 0
             lastAnalisisTime = 0
         }
@@ -90,23 +90,22 @@ class SensorDataActivity : BaseVoiceActivity() {
         setupManualRefreshButton()
         handleIntentNavigation()
 
-        // ✅ MEJORADO: Carga inteligente con caché
         lifecycleScope.launch {
-            Log.d(TAG, "🔄 Iniciando carga inicial...")
+            Log.d(TAG, "Iniciando carga inicial...")
 
             // Verificar si las configuraciones en caché son válidas
             val configCacheAge = System.currentTimeMillis() - lastConfigLoadTime
             val needsConfigReload = cachedConfiguraciones == null || configCacheAge > CONFIG_CACHE_DURATION
 
             if (needsConfigReload) {
-                Log.d(TAG, "📥 Cargando configuraciones desde servidor...")
+                Log.d(TAG, "Cargando configuraciones desde servidor...")
                 loadConfiguraciones()
             } else {
-                Log.d(TAG, "⚡ Usando configuraciones cacheadas (edad: ${configCacheAge}ms)")
+                Log.d(TAG, "Usando configuraciones cacheadas (edad: ${configCacheAge}ms)")
             }
 
             // Cargar estado del proceso
-            Log.d(TAG, "🔄 Cargando estado del proceso...")
+            Log.d(TAG, "Cargando estado del proceso...")
             procesoViewModel.loadProcesoStatus()
 
             // Esperar un poco para la red
@@ -114,17 +113,17 @@ class SensorDataActivity : BaseVoiceActivity() {
 
             // Obtener estado (usar true por defecto si es null)
             val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
-            Log.d(TAG, "📊 Estado del proceso: $estadoProceso")
+            Log.d(TAG, "Estado del proceso: $estadoProceso")
 
             // Precargar análisis en background
             preloadAnalisis()
 
             // Cargar sensores
             if (cachedConfiguraciones != null) {
-                Log.d(TAG, "✅ Cargando sensores con configuraciones")
+                Log.d(TAG, "Cargando sensores con configuraciones")
                 loadSensorsAndCharts(estadoProceso, isManualRefresh = false)
             } else {
-                Log.w(TAG, "⚠️ Sin configuraciones - mostrando defaults")
+                Log.w(TAG, "Sin configuraciones - mostrando defaults")
                 showDefaultCharts(estadoProceso)
             }
         }
@@ -132,7 +131,7 @@ class SensorDataActivity : BaseVoiceActivity() {
         // Observer para actualizaciones posteriores
         procesoViewModel.isProcesoActivo.observe(this) { activo ->
             if (activo != null && !isFirstLoad) {
-                Log.d(TAG, "🔄 Actualización de estado detectada: $activo")
+                Log.d(TAG, "Actualización de estado detectada: $activo")
                 lifecycleScope.launch {
                     if (cachedConfiguraciones != null) {
                         loadSensorsAndCharts(activo, isManualRefresh = false)
@@ -221,7 +220,7 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     override fun onNetworkRetry() {
-        Log.d(TAG, "🔄 Reintentando carga completa...")
+        Log.d(TAG, "Reintentando carga completa...")
         lifecycleScope.launch {
             UiUtils.showSnackbar(binding.root, "Reconectando...", false)
             loadConfiguraciones()
@@ -294,7 +293,7 @@ class SensorDataActivity : BaseVoiceActivity() {
             voiceConfigViewModel.uiState.collect { state ->
                 when (state) {
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
-                        Log.e(TAG, "❌ Error configuración voz: ${state.message}")
+                        Log.e(TAG, "Error configuración voz: ${state.message}")
                         if (state.message.contains("Error de red", ignoreCase = true) ||
                             state.message.contains("IOException", ignoreCase = true)) {
                             showNetworkError("Error de voz: ${state.message}")
@@ -339,11 +338,11 @@ class SensorDataActivity : BaseVoiceActivity() {
 
             while (true) {
                 try {
-                    Log.d(TAG, "🕒 Refresh automático - Solicitando estado del proceso")
+                    Log.d(TAG, "Refresh automático - Solicitando estado del proceso")
                     procesoViewModel.loadProcesoStatus()
                     errorCount = 0 // Reset error count on success
 
-                    // ✅ Actualizar análisis en background periódicamente
+                    // Actualizar análisis en background periódicamente
                     if (procesoViewModel.isProcesoActivo.value == true) {
                         preloadAnalisis()
                     }
@@ -365,27 +364,27 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     private suspend fun loadConfiguraciones() {
-        Log.d(TAG, "⚙️ Cargando configuraciones de gráficas...")
+        Log.d(TAG, "Cargando configuraciones de gráficas...")
 
         when (val result = graficasRepo.getGraficas()) {
             is ResultWrapper.Success -> {
                 cachedConfiguraciones = result.data
                 lastConfigLoadTime = System.currentTimeMillis()
-                Log.d(TAG, "✅ Configuraciones cargadas y cacheadas: ${result.data.size}")
+                Log.d(TAG, "Configuraciones cargadas y cacheadas: ${result.data.size}")
 
                 result.data.forEach { config ->
-                    Log.d(TAG, "📋 Config - SensorID: ${config.sensor_id}, Tipo: ${config.tipo_grafica}")
+                    Log.d(TAG, "Config - SensorID: ${config.sensor_id}, Tipo: ${config.tipo_grafica}")
                 }
 
                 isFirstLoad = false
             }
             is ResultWrapper.Error -> {
                 val errorMsg = "Error configuraciones: ${result.message}"
-                Log.e(TAG, "❌ $errorMsg")
+                Log.e(TAG, "$errorMsg")
 
                 // ✅ Si hay configuraciones en caché antiguas, usarlas
                 if (cachedConfiguraciones != null) {
-                    Log.w(TAG, "⚠️ Error de red, pero usando configuraciones en caché")
+                    Log.w(TAG, "Error de red, pero usando configuraciones en caché")
                 } else {
                     if (result.message.contains("Error de red", ignoreCase = true) ||
                         result.message.contains("IOException", ignoreCase = true)) {
@@ -399,7 +398,7 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     /**
-     * ✅ NUEVO: Precargar análisis en background
+     *✅ NUEVO: Precargar análisis en background
      */
     private fun preloadAnalisis() {
         lifecycleScope.launch {
@@ -407,12 +406,12 @@ class SensorDataActivity : BaseVoiceActivity() {
                 // Solo precargar si el análisis está expirado o no existe
                 val analisisCacheAge = System.currentTimeMillis() - lastAnalisisTime
                 if (cachedAnalisis == null || analisisCacheAge > ANALISIS_CACHE_DURATION) {
-                    Log.d(TAG, "🔄 Precargando análisis en background...")
+                    Log.d(TAG, "Precargando análisis en background...")
 
                     // Verificar si hay proceso activo antes de analizar
                     val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
                     if (!estadoProceso) {
-                        Log.d(TAG, "⏸️ Proceso inactivo, no se precarga análisis")
+                        Log.d(TAG, "Proceso inactivo, no se precarga análisis")
                         return@launch
                     }
 
@@ -420,41 +419,40 @@ class SensorDataActivity : BaseVoiceActivity() {
                         is ResultWrapper.Success -> {
                             cachedAnalisis = result.data
                             lastAnalisisTime = System.currentTimeMillis()
-                            Log.d(TAG, "✅ Análisis precargado exitosamente")
+                            Log.d(TAG, "Análisis precargado exitosamente")
                         }
                         else -> {
                             // Silencioso en error de precarga
-                            Log.w(TAG, "⚠️ No se pudo precargar análisis")
+                            Log.w(TAG, "No se pudo precargar análisis")
                         }
                     }
                 } else {
-                    Log.d(TAG, "⚡ Análisis en caché está fresco (${analisisCacheAge}ms)")
+                    Log.d(TAG, "Análisis en caché está fresco (${analisisCacheAge}ms)")
                 }
             } catch (e: Exception) {
                 // Silencioso, no afecta al usuario
-                Log.d(TAG, "⚠️ Error en precarga de análisis: ${e.message}")
+                Log.d(TAG, "Error en precarga de análisis: ${e.message}")
             }
         }
     }
 
     private suspend fun loadSensorsAndCharts(hayProcesoActivo: Boolean, isManualRefresh: Boolean) {
         val configuraciones = cachedConfiguraciones ?: run {
-            Log.w(TAG, "📭 No hay configuraciones en caché - mostrando gráficas por defecto")
+            Log.w(TAG, "No hay configuraciones en caché - mostrando gráficas por defecto")
             runOnUiThread {
                 showDefaultCharts(hayProcesoActivo)
             }
             return
         }
 
-        Log.d(TAG, "🚀 Cargando ${configuraciones.size} sensores. Proceso activo: $hayProcesoActivo. Manual: $isManualRefresh")
+        Log.d(TAG, "Cargando ${configuraciones.size} sensores. Proceso activo: $hayProcesoActivo. Manual: $isManualRefresh")
 
-        // ✅ MOSTRAR loading SOLAMENTE en la carga INICIAL o MANUAL
         val hayCacheDatos = configuraciones.any { config ->
             SensorCache.isFresh(config.sensor_id)
         }
 
         if ((!hayCacheDatos && hayProcesoActivo) || isManualRefresh) {
-            Log.d(TAG, "📊 Forzando carga/refresco - mostrando loading")
+            Log.d(TAG, "Forzando carga/refresco - mostrando loading")
             if (!isManualRefresh) {
                 UiUtils.showLoading(this, "Actualizando datos...")
             }
@@ -464,13 +462,13 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         try {
             for (config in configuraciones) {
-                Log.d(TAG, "🔄 Procesando sensor ${config.sensor_id}...")
+                Log.d(TAG, "Procesando sensor ${config.sensor_id}...")
                 loadSensorData(config, hayProcesoActivo, isManualRefresh)
                 delay(100)
             }
             Log.d(TAG, "✅ Todos los sensores procesados")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error general en carga sensores: ${e.message}", e)
+            Log.e(TAG, "Error general en carga sensores: ${e.message}", e)
             if (e.message?.contains("Error de red", ignoreCase = true) == true ||
                 e.message?.contains("IOException", ignoreCase = true) == true) {
                 showNetworkError("Error: ${e.message}")
@@ -494,16 +492,14 @@ class SensorDataActivity : BaseVoiceActivity() {
             2 -> "Presión" to binding.cardPresion.root
             3 -> "Temperatura" to binding.cardTemperatura.root
             else -> {
-                Log.w(TAG, "⚠️ Sensor ID desconocido: $sensorId")
+                Log.w(TAG, "Sensor ID desconocido: $sensorId")
                 return
             }
         }
-
-        // ✅ PRIMERO: Intentar cargar desde caché (SIEMPRE, a menos que sea recarga manual)
         val cachedLecturas = if (!isManualRefresh) SensorCache.get(sensorId) else null
 
         if (cachedLecturas != null) {
-            Log.d(TAG, "⚡ CARGA INSTANTÁNEA desde caché: $nombreSensor (${cachedLecturas.size} lecturas)")
+            Log.d(TAG, "CARGA INSTANTÁNEA desde caché: $nombreSensor (${cachedLecturas.size} lecturas)")
             runOnUiThread {
                 try {
                     val entries = cachedLecturas.mapIndexed { index, lectura ->
@@ -511,11 +507,11 @@ class SensorDataActivity : BaseVoiceActivity() {
                     }
                     chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ ERROR dibujando desde caché: ${e.message}", e)
+                    Log.e(TAG, "ERROR dibujando desde caché: ${e.message}", e)
                 }
             }
 
-            // ✅ Si el proceso está activo, actualizar en background SIN bloquear UI
+            //  Si el proceso está activo, actualizar en background SIN bloquear UI
             if (hayProcesoActivo) {
                 lifecycleScope.launch {
                     delay(500)
@@ -525,7 +521,7 @@ class SensorDataActivity : BaseVoiceActivity() {
             return
         }
 
-        // ✅ SEGUNDO: Si no hay caché O es recarga manual, cargar desde red
+        //  Si no hay caché O es recarga manual, cargar desde red
         if (!hayProcesoActivo && !isManualRefresh) {
             runOnUiThread {
                 showNoDataChart(cardView, nombreSensor, false)
@@ -555,7 +551,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                                 }
                                 chartManager.displayChart(tipoGrafica, cardView, nombreSensor, color, entries, sensorId)
                             } catch (e: Exception) {
-                                Log.e(TAG, "❌ ERROR renderizando: ${e.message}", e)
+                                Log.e(TAG, "ERROR renderizando: ${e.message}", e)
                             }
                         }
                     } else {
@@ -565,7 +561,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                     }
                 }
                 is ResultWrapper.Error -> {
-                    Log.e(TAG, "❌ Error $nombreSensor: ${lecturaResult.message}")
+                    Log.e(TAG, "Error $nombreSensor: ${lecturaResult.message}")
                     runOnUiThread {
                         showNoDataChart(cardView, nombreSensor, hayProcesoActivo, "🌐 Error de conexión")
                     }
@@ -591,17 +587,17 @@ class SensorDataActivity : BaseVoiceActivity() {
                 val result = lecturaRepo.getLecturas(sensorId)
                 if (result is ResultWrapper.Success && result.data.isNotEmpty()) {
                     SensorCache.put(sensorId, result.data)
-                    Log.d(TAG, "🔄 Cache actualizado en background: sensor $sensorId")
+                    Log.d(TAG, "Cache actualizado en background: sensor $sensorId")
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "⚠️ Error actualizando cache background: ${e.message}")
+            Log.w(TAG, "Error actualizando cache background: ${e.message}")
         }
     }
 
     override fun onVoiceInitialized() {
         super.onVoiceInitialized()
-        Log.d(TAG, "🎙️ Voz inicializada - Iniciando verificaciones...")
+        Log.d(TAG, "🎙Voz inicializada - Iniciando verificaciones...")
 
         lifecycleScope.launch {
             delay(1000)
@@ -612,14 +608,13 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     /**
-     * ✅ MEJORADO: Voz instantánea con caché
+     *  Voz instantánea con caché
      */
     override fun startSpeaking() {
         super.startSpeaking()
 
         lifecycleScope.launch {
             try {
-                // ✅ PRIMERO: Verificar si hay proceso activo
                 val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
 
                 if (!estadoProceso) {
@@ -627,7 +622,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                     return@launch
                 }
 
-                // ✅ SEGUNDO: Verificar caché de análisis
+                // Verificar caché de análisis
                 val analisisCacheAge = System.currentTimeMillis() - lastAnalisisTime
                 val shouldUseCache = cachedAnalisis != null &&
                         analisisCacheAge < ANALISIS_CACHE_DURATION
@@ -637,14 +632,14 @@ class SensorDataActivity : BaseVoiceActivity() {
                     val fullMessage = formatAnalysisMessage(cachedAnalisis!!)
                     speakWithPausesAndWaveform(fullMessage, 1000L)
 
-                    // ✅ Actualizar caché en background mientras habla
+                    //  caché en background mientras habla
                     updateAnalisisInBackground()
                     return@launch
                 }
 
-                Log.d(TAG, "📡 Obteniendo análisis desde servidor...")
+                Log.d(TAG, "Obteniendo análisis desde servidor...")
 
-                // ✅ TERCERO: Si no hay caché, mostrar mensaje inmediato y luego cargar
+                //  Si no hay caché, mostrar mensaje inmediato y luego cargar
                 speakWithPausesAndWaveform("Analizando datos de sensores...", 500L)
 
                 // Obtener análisis con timeout
@@ -654,7 +649,7 @@ class SensorDataActivity : BaseVoiceActivity() {
 
                 when (analisisResult) {
                     is ResultWrapper.Success -> {
-                        // ✅ Detener mensaje anterior y hablar con nuevo análisis
+                        // Detener mensaje anterior y hablar con nuevo análisis
                         stopSpeaking()
                         cachedAnalisis = analisisResult.data
                         lastAnalisisTime = System.currentTimeMillis()
@@ -663,17 +658,17 @@ class SensorDataActivity : BaseVoiceActivity() {
                         speakWithPausesAndWaveform(fullMessage, 1000L)
                     }
                     is ResultWrapper.Error -> {
-                        Log.e(TAG, "❌ Error en análisis: ${analisisResult.message}")
+                        Log.e(TAG, "Error en análisis: ${analisisResult.message}")
 
                         stopSpeaking()
 
-                        // ✅ Si hay caché antiguo, usarlo aunque haya expirado
+                        // Si hay caché antiguo, usarlo aunque haya expirado
                         if (cachedAnalisis != null) {
-                            Log.w(TAG, "⚠️ Usando análisis cacheadO (expiró)")
+                            Log.w(TAG, "Usando análisis cacheadO (expiró)")
                             val fullMessage = formatAnalysisMessage(cachedAnalisis!!)
                             speakWithPausesAndWaveform(fullMessage, 1000L)
                         } else {
-                            // ✅ Mensaje predeterminado si no hay caché
+                            // Mensaje predeterminado si no hay caché
                             speakWithPausesAndWaveform(
                                 "No hay datos de análisis disponibles. Revisa la conexión con el servidor.",
                                 500L
@@ -686,11 +681,11 @@ class SensorDataActivity : BaseVoiceActivity() {
                     }
                 }
             } catch (e: TimeoutCancellationException) {
-                Log.e(TAG, "⏰ Timeout en análisis de voz")
+                Log.e(TAG, "Timeout en análisis de voz")
 
                 stopSpeaking()
 
-                // ✅ Usar caché si existe
+                // Usar caché si existe
                 if (cachedAnalisis != null) {
                     val fullMessage = formatAnalysisMessage(cachedAnalisis!!)
                     speakWithPausesAndWaveform(fullMessage, 1000L)
@@ -701,26 +696,26 @@ class SensorDataActivity : BaseVoiceActivity() {
                     )
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error general en voz: ${e.message}")
+                Log.e(TAG, "Error general en voz: ${e.message}")
                 speakWithPausesAndWaveform("Error al obtener análisis.", 500L)
             }
         }
     }
 
     /**
-     * ✅ NUEVO: Actualizar análisis en background
+     * : Actualizar análisis en background
      */
     private fun updateAnalisisInBackground() {
         lifecycleScope.launch {
             try {
                 val analisisCacheAge = System.currentTimeMillis() - lastAnalisisTime
                 if (analisisCacheAge > ANALISIS_CACHE_DURATION) {
-                    Log.d(TAG, "🔄 Actualizando análisis en background...")
+                    Log.d(TAG, "Actualizando análisis en background...")
                     when (val result = analisisRepo.analizarLectura()) {
                         is ResultWrapper.Success -> {
                             cachedAnalisis = result.data
                             lastAnalisisTime = System.currentTimeMillis()
-                            Log.d(TAG, "✅ Análisis actualizado en background")
+                            Log.d(TAG, "Análisis actualizado en background")
                         }
                         else -> {
                             // Error silencioso
@@ -729,7 +724,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                 }
             } catch (e: Exception) {
                 // Error silencioso
-                Log.d(TAG, "⚠️ Error actualizando análisis background: ${e.message}")
+                Log.d(TAG, "Error actualizando análisis background: ${e.message}")
             }
         }
     }
@@ -840,7 +835,7 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     private fun showDefaultCharts(hayProcesoActivo: Boolean) {
-        Log.d(TAG, "📊 Mostrando gráficas por defecto. Proceso activo: $hayProcesoActivo")
+        Log.d(TAG, "Mostrando gráficas por defecto. Proceso activo: $hayProcesoActivo")
         showNoDataChart(binding.cardTemperatura.root, "Temperatura", hayProcesoActivo)
         showNoDataChart(binding.cardPresion.root, "Presión", hayProcesoActivo)
         showNoDataChart(binding.cardMq4.root, "Gas Metano", hayProcesoActivo)

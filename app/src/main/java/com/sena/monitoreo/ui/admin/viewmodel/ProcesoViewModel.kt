@@ -12,13 +12,10 @@ import java.io.IOException
 
 class ProcesoViewModel(private val repository: ProcesoRepository) : ViewModel() {
 
-    // 💡 CORRECCIÓN CRÍTICA: Inicializar como NULL para saber si ya se cargó
     private val _isProcesoActivo = MutableLiveData<Boolean?>(null)
     val isProcesoActivo: LiveData<Boolean?> = _isProcesoActivo
-
     private val _procesoStatus = MutableLiveData<String>()
     val procesoStatus: LiveData<String> = _procesoStatus
-
     private val _isLoading = MutableLiveData<Boolean>(false)
     val isLoading: LiveData<Boolean> = _isLoading
 
@@ -33,24 +30,19 @@ class ProcesoViewModel(private val repository: ProcesoRepository) : ViewModel() 
                     is ResultWrapper.Success -> {
                         val mensajeFinal = result.data.mensaje ?: "Proceso iniciado correctamente"
                         _procesoStatus.postValue(mensajeFinal)
-                        _isProcesoActivo.postValue(true) // 💡 Siempre true al iniciar
-                        Log.d("ProcesoVM", "✅ Proceso INICIADO - Estado: true")
+                        _isProcesoActivo.postValue(true)
                     }
                     is ResultWrapper.Error -> {
                         val mensajeError = result.message ?: "Error desconocido al iniciar el proceso"
                         _procesoStatus.postValue(mensajeError)
-                        // 💡 NO cambiar _isProcesoActivo en error - mantener estado actual
-                        Log.e("ProcesoVM", "❌ Error iniciando: $mensajeError")
                     }
                 }
             } catch (e: IOException) {
                 val errorMsg = "Error de red: No se pudo conectar al servidor."
                 _procesoStatus.postValue(errorMsg)
-                Log.e("ProcesoVM", "🌐 Error red iniciando: ${e.message}")
             } catch (e: Exception) {
                 val errorMsg = "Error inesperado: ${e.message}"
                 _procesoStatus.postValue(errorMsg)
-                Log.e("ProcesoVM", "💥 Error inesperado iniciando: ${e.message}")
             } finally {
                 _isLoading.postValue(false)
             }
@@ -68,24 +60,19 @@ class ProcesoViewModel(private val repository: ProcesoRepository) : ViewModel() 
                     is ResultWrapper.Success -> {
                         val mensajeFinal = result.data.mensaje ?: "Proceso finalizado correctamente"
                         _procesoStatus.postValue(mensajeFinal)
-                        _isProcesoActivo.postValue(false) // 💡 Siempre false al finalizar
-                        Log.d("ProcesoVM", "✅ Proceso FINALIZADO - Estado: false")
+                        _isProcesoActivo.postValue(false)
                     }
                     is ResultWrapper.Error -> {
                         val mensajeError = result.message ?: "Error desconocido al finalizar el proceso"
                         _procesoStatus.postValue(mensajeError)
-                        // 💡 NO cambiar _isProcesoActivo en error - mantener estado actual
-                        Log.e("ProcesoVM", "❌ Error finalizando: $mensajeError")
                     }
                 }
             } catch (e: IOException) {
                 val errorMsg = "Error de red: No se pudo conectar al servidor."
                 _procesoStatus.postValue(errorMsg)
-                Log.e("ProcesoVM", "🌐 Error red finalizando: ${e.message}")
             } catch (e: Exception) {
                 val errorMsg = "Error inesperado: ${e.message}"
                 _procesoStatus.postValue(errorMsg)
-                Log.e("ProcesoVM", "💥 Error inesperado finalizando: ${e.message}")
             } finally {
                 _isLoading.postValue(false)
             }
@@ -93,7 +80,7 @@ class ProcesoViewModel(private val repository: ProcesoRepository) : ViewModel() 
     }
 
     /**
-     * 💡 CORRECCIÓN CRÍTICA: Método optimizado para cargar el estado
+     * Método para cargar el estado
      */
     fun loadProcesoStatus() {
         viewModelScope.launch {
@@ -104,10 +91,8 @@ class ProcesoViewModel(private val repository: ProcesoRepository) : ViewModel() 
                         val nuevoEstado = result.data.proceso_activo
                         val estadoAnterior = _isProcesoActivo.value
 
-                        // 💡 SOLO actualizar si el estado realmente cambió
                         if (estadoAnterior != nuevoEstado) {
                             _isProcesoActivo.value = nuevoEstado
-                            Log.d("ProcesoVM", "🔄 Estado ACTUALIZADO: $estadoAnterior -> $nuevoEstado")
                         } else {
                             Log.d("ProcesoVM", "⚡ Estado MANTENIDO: $nuevoEstado (sin cambios)")
                         }
@@ -117,32 +102,17 @@ class ProcesoViewModel(private val repository: ProcesoRepository) : ViewModel() 
                     is ResultWrapper.Error -> {
                         val mensajeError = result.message ?: "Error al verificar estado"
                         _procesoStatus.value = mensajeError
-                        // 💡 NO cambiar _isProcesoActivo en error - mantener último estado conocido
-                        Log.e("ProcesoVM", "❌ Error cargando estado: $mensajeError")
-                        Log.d("ProcesoVM", "📊 Manteniendo estado actual: ${_isProcesoActivo.value}")
                     }
                 }
             } catch (e: IOException) {
                 val errorMsg = "Error de red al verificar estado"
                 _procesoStatus.value = errorMsg
-                Log.e("ProcesoVM", "🌐 Error red cargando estado: ${e.message}")
-                Log.d("ProcesoVM", "📊 Manteniendo estado actual: ${_isProcesoActivo.value}")
             } catch (e: Exception) {
                 val errorMsg = "Error inesperado: ${e.message}"
                 _procesoStatus.value = errorMsg
-                Log.e("ProcesoVM", "💥 Error inesperado cargando estado: ${e.message}")
-                Log.d("ProcesoVM", "📊 Manteniendo estado actual: ${_isProcesoActivo.value}")
             } finally {
                 _isLoading.value = false
             }
         }
-    }
-
-    /**
-     * 💡 NUEVO: Método para forzar un estado específico (útil para testing)
-     */
-    fun setProcesoEstadoForzado(activo: Boolean) {
-        Log.d("ProcesoVM", "🔧 Estado FORZADO: $activo")
-        _isProcesoActivo.value = activo
     }
 }
