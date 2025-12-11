@@ -143,6 +143,9 @@ class HomeUserActivity : BaseVoiceActivity() {
     /**
      * Manejo ULTRA-RÁPIDO del click del botón
      */
+    /**
+     * Manejo ULTRA-RÁPIDO del click del botón
+     */
     private fun handlePlayButtonClick() {
         if (!isVoiceInitialized) {
             Log.w(TAG, "⏳ TTS aún no inicializado, mostrando mensaje...")
@@ -152,7 +155,11 @@ class HomeUserActivity : BaseVoiceActivity() {
 
         if (voiceManager.isSpeaking) {
             // Si ya está hablando, detener
+            Log.d(TAG, "⏸️ Deteniendo voz manualmente")
             stopSpeaking()
+            // Asegurarse de detener waveform también
+            waveformManager.stopAnimation()
+            binding.mainHeader.waveformSection.btnPlayMessage.setIconResource(R.drawable.ic_play)
             return
         }
 
@@ -164,7 +171,9 @@ class HomeUserActivity : BaseVoiceActivity() {
         // 2. Hablar SIN delays
         speakImmediately()
     }
-
+    /**
+     * Hablar inmediatamente sin procesos adicionales
+     */
     /**
      * Hablar inmediatamente sin procesos adicionales
      */
@@ -177,15 +186,21 @@ class HomeUserActivity : BaseVoiceActivity() {
             voiceManager.setOnUtteranceCompletedListener {
                 lifecycleScope.launch {
                     kotlinx.coroutines.delay(200)
+                    // 1. Cambiar icono
                     binding.mainHeader.waveformSection.btnPlayMessage.setIconResource(R.drawable.ic_play)
+                    // 2. DETENER waveform cuando termine de hablar
+                    waveformManager.stopAnimation()
+                    Log.d(TAG, "🔇 Voz terminada - Waveform detenido")
                 }
             }
 
             voiceManager.setOnSpeechStartedListener {
                 lifecycleScope.launch {
+                    // 3. Iniciar waveform cuando empiece a hablar
                     waveformManager.startContinuousAnimation(this) {
                         Log.d(TAG, "Waveform completado")
                     }
+                    Log.d(TAG, "🔊 Voz iniciada - Waveform iniciado")
                 }
             }
 
@@ -197,6 +212,8 @@ class HomeUserActivity : BaseVoiceActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Error al hablar: ${e.message}")
             binding.mainHeader.waveformSection.btnPlayMessage.setIconResource(R.drawable.ic_play)
+            // Asegurarse de detener waveform en caso de error
+            waveformManager.stopAnimation()
         }
     }
 

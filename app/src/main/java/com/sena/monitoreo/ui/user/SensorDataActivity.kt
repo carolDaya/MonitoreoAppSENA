@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.async
 
 class SensorDataActivity : BaseVoiceActivity() {
 
@@ -76,6 +77,7 @@ class SensorDataActivity : BaseVoiceActivity() {
     }
 
     private var isFirstLoad = true
+    private var isLoadingManualRefresh = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -130,7 +132,7 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         // Observer para actualizaciones posteriores
         procesoViewModel.isProcesoActivo.observe(this) { activo ->
-            if (activo != null && !isFirstLoad) {
+            if (activo != null && !isFirstLoad && !isLoadingManualRefresh) {
                 Log.d(TAG, "Actualización de estado detectada: $activo")
                 lifecycleScope.launch {
                     if (cachedConfiguraciones != null) {
@@ -145,34 +147,195 @@ class SensorDataActivity : BaseVoiceActivity() {
 
     private fun setupManualRefreshButton() {
         binding.btnManualRefresh.setOnClickListener {
-            Log.d(TAG, "Manual Refresh - Botón presionado")
-            // Mostrar loading inmediatamente
-            UiUtils.showLoading(this, "Recargando datos manualmente...")
-
-            // Iniciar la recarga en una corrutina
-            lifecycleScope.launch {
-                val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
-
-                // 1. Recargar configuraciones si es necesario
-                val configCacheAge = System.currentTimeMillis() - lastConfigLoadTime
-                val needsConfigReload = cachedConfiguraciones == null || configCacheAge > CONFIG_CACHE_DURATION
-                if (needsConfigReload) {
-                    loadConfiguraciones()
-                }
-
-                // 2. Precargar análisis también
-                preloadAnalisis()
-
-                // 3. Forzar la recarga de datos de sensores
-                if (cachedConfiguraciones != null) {
-                    loadSensorsAndCharts(estadoProceso, isManualRefresh = true)
-                } else {
-                    // Si aún no hay configuraciones, solo mostrar el estado por defecto
-                    showDefaultCharts(estadoProceso)
-                }
-                UiUtils.hideLoading()
-                UiUtils.showSnackbar(binding.root, "Datos actualizados", false)
+            if (isLoadingManualRefresh) {
+                Log.d(TAG, "Ya hay una recarga manual en curso")
+                return@setOnClickListener
             }
+
+            Log.d(TAG, "Manual Refresh - Botón presionado - FORZANDO TODAS LAS RECARGAS")
+            isLoadingManualRefresh = true
+
+            // Mostrar loading inmediatamente
+            UiUtils.showLoading(this, "Recargando TODO manualmente...")
+
+            // Iniciar la recarga COMPLETA en una corrutina
+            lifecycleScope.launch {
+                try {
+                    val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
+
+                    // 🔄 PASO 1: LIMPIAR TODOS LOS CACHÉS
+                    Log.d(TAG, "🔄 Paso 1: Limpiando cachés...")
+                    clearAllCaches()
+
+                    // 🔄 PASO 2: RECARGAR CONFIGURACIONES DE GRÁFICAS (FORZADO)
+                    Log.d(TAG, "🔄 Paso 2: Forzando recarga de configuraciones...")
+                    val configResult = async { forceLoadConfiguraciones() }
+
+                    // 🔄 PASO 3: RECARGAR CONFIGURACIÓN DE VOZ (FORZADO)
+                    Log.d(TAG, "🔄 Paso 3: Forzando recarga de configuración de voz...")
+                    val voiceResult = async { forceReloadVoiceConfig() }
+
+                    // 🔄 PASO 4: RECARGAR ANÁLISIS (FORZADO)
+                    Log.d(TAG, "🔄 Paso 4: Forzando recarga de análisis...")
+                    val analisisResult = async { forceReloadAnalisis() }
+
+                    // 🔄 PASO 5: RECARGAR ESTADO DEL PROCESO
+                    Log.d(TAG, "🔄 Paso 5: Recargando estado del proceso...")
+                    procesoViewModel.loadProcesoStatus()
+
+                    // Esperar que todo termine
+                    configResult.await()
+                    voiceResult.await()
+                    analisisResult.await()
+
+                    // Pequeña pausa para asegurar actualizaciones
+                    delay(500)
+
+                    // 🔄 PASO 6: RECARGAR SENSORES Y GRÁFICAS (FORZADO)
+                    Log.d(TAG, "🔄 Paso 6: Forzando recarga de sensores...")
+                    if (cachedConfiguraciones != null) {
+                        loadSensorsAndCharts(estadoProceso, isManualRefresh = true)
+                    } else {
+                        Log.w(TAG, "Sin configuraciones después de recargar")
+                        showDefaultCharts(estadoProceso)
+                    }
+
+                    // 🔄 PASO 7: VERIFICAR ALERTAS
+                    Log.d(TAG, "🔄 Paso 7: Verificando alertas...")
+                    alertManager.forceAlertCheck(lifecycleScope)
+
+                    Log.d(TAG, "✅ Recarga manual COMPLETA exitosa")
+                    UiUtils.showSnackbar(binding.root, "✅ Todo actualizado: gráficas, voz y datos", false)
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error en recarga manual: ${e.message}", e)
+                    UiUtils.showSnackbar(binding.root, "Error en recarga: ${e.message}", true)
+                } finally {
+                    UiUtils.hideLoading()
+                    isLoadingManualRefresh = false
+                }
+            }
+        }
+    }
+
+    private fun clearAllCaches() {
+        Log.d(TAG, "🧹 Limpiando todos los cachés...")
+
+        // Limpiar caché estático (companion object)
+        clearCache()
+
+        // Limpiar caché de sensores (tu SensorCache)
+        SensorCache.clear()
+
+        // Limpiar caché del ChartManager
+        chartManager.clearChartCache()
+        // O también puedes usar: chartManager.clearAll()
+
+        // Limpiar caché de análisis local
+        lastAnalisisTime = 0
+        lastConfigLoadTime = 0
+
+        Log.d(TAG, "✅ Todos los cachés limpiados")
+    }
+
+    /**
+     * 🔄 NUEVO: Forzar recarga de configuraciones (ignora caché)
+     */
+    private suspend fun forceLoadConfiguraciones(): Boolean {
+        Log.d(TAG, "🔄 Forzando recarga de configuraciones...")
+
+        return try {
+            when (val result = graficasRepo.getGraficas()) {
+                is ResultWrapper.Success -> {
+                    cachedConfiguraciones = result.data
+                    lastConfigLoadTime = System.currentTimeMillis()
+                    Log.d(TAG, "✅ Configuraciones forzadas cargadas: ${result.data.size}")
+
+                    result.data.forEach { config ->
+                        Log.d(TAG, "📊 Config forzada - SensorID: ${config.sensor_id}, Tipo: ${config.tipo_grafica}")
+                    }
+                    true
+                }
+                is ResultWrapper.Error -> {
+                    Log.e(TAG, "❌ Error forzando configuraciones: ${result.message}")
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Excepción forzando configuraciones: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * 🔄 NUEVO: Forzar recarga de configuración de voz
+     */
+    private suspend fun forceReloadVoiceConfig(): Boolean {
+        Log.d(TAG, "🔄 Forzando recarga de configuración de voz...")
+
+        return try {
+            // Solo usar el método con forceRefresh = true
+            voiceConfigViewModel.loadCurrentConfig(forceRefresh = true)
+
+            // Esperar un momento para que se cargue
+            delay(500)
+
+            // Verificar si se cargó correctamente
+            var loadedSuccessfully = false
+            var attempts = 0
+            val maxAttempts = 5
+
+            while (!loadedSuccessfully && attempts < maxAttempts) {
+                delay(200)
+                attempts++
+
+                // Verificar el estado actual
+                voiceConfigViewModel.uiState.value?.let { state ->
+                    if (state is VoiceConfigViewModel.VoiceConfigUiState.Success) {
+                        loadedSuccessfully = true
+                        Log.d(TAG, "✅ Configuración de voz forzada recargada exitosamente (intento $attempts)")
+                    }
+                }
+            }
+
+            if (!loadedSuccessfully) {
+                Log.w(TAG, "⚠️ No se pudo verificar carga de voz forzada después de $attempts intentos")
+            }
+
+            loadedSuccessfully
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error forzando configuración de voz: ${e.message}")
+            false
+        }
+    }
+    /**
+     * 🔄 NUEVO: Forzar recarga de análisis
+     */
+    private suspend fun forceReloadAnalisis(): Boolean {
+        Log.d(TAG, "🔄 Forzando recarga de análisis...")
+
+        return try {
+            val estadoProceso = procesoViewModel.isProcesoActivo.value ?: true
+            if (!estadoProceso) {
+                Log.d(TAG, "⏸️ Proceso inactivo, no se fuerza análisis")
+                return false
+            }
+
+            when (val result = analisisRepo.analizarLectura()) {
+                is ResultWrapper.Success -> {
+                    cachedAnalisis = result.data
+                    lastAnalisisTime = System.currentTimeMillis()
+                    Log.d(TAG, "✅ Análisis forzado recargado: ${result.data.tipo_estado}")
+                    true
+                }
+                else -> {
+                    Log.w(TAG, "⚠️ No se pudo forzar recarga de análisis")
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error forzando análisis: ${e.message}")
+            false
         }
     }
 
@@ -223,6 +386,7 @@ class SensorDataActivity : BaseVoiceActivity() {
         Log.d(TAG, "Reintentando carga completa...")
         lifecycleScope.launch {
             UiUtils.showSnackbar(binding.root, "Reconectando...", false)
+            clearAllCaches() // 🔄 Limpiar cachés en caso de red
             loadConfiguraciones()
             procesoViewModel.loadProcesoStatus()
             preloadAnalisis()
@@ -269,6 +433,7 @@ class SensorDataActivity : BaseVoiceActivity() {
             putExtra("alert_message", alertMessage) // Y también el mensaje formateado
         })
     }
+
     private fun setupNavigation() {
         navigationManager = NavigationManager(
             context = this,
@@ -299,10 +464,12 @@ class SensorDataActivity : BaseVoiceActivity() {
 
         lifecycleScope.launch {
             voiceConfigViewModel.currentConfig.collect { config ->
+                Log.d(TAG, "🔊 Configuración de voz recibida: Pitch=${config.voicePitch}, Gender=${config.voiceGender}")
                 voiceManager.currentPitch = config.voicePitch.toFloat()
                 voiceManager.currentGender = config.voiceGender
                 if (isVoiceInitialized) {
                     voiceManager.applyTtsSettings()
+                    Log.d(TAG, "✅ Configuración de voz aplicada")
                 }
             }
         }
@@ -320,7 +487,7 @@ class SensorDataActivity : BaseVoiceActivity() {
                         }
                     }
                     VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        // Éxito en la carga - no necesita acción específica
+                        Log.d(TAG, "✅ Configuración de voz cargada exitosamente")
                     }
                     else -> {}
                 }

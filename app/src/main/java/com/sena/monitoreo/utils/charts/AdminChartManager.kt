@@ -24,8 +24,8 @@ class AdminChartManager(
 
     companion object {
         private const val SENSOR_METANO = 1
-        private const val SENSOR_TEMPERATURA = 2
-        private const val SENSOR_PRESION = 3
+        private const val SENSOR_TEMPERATURA = 3
+        private const val SENSOR_PRESION = 2
     }
 
     // --- DATOS FALSOS PARA CONFIGURACIÓN ---

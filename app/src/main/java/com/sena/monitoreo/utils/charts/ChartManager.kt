@@ -21,6 +21,10 @@ class ChartManager(private val context: Context) {
         private const val SENSOR_TEMPERATURA = 2
         private const val SENSOR_PRESION = 3
     }
+
+    // Cache interno de gráficas
+    private val chartCache = mutableMapOf<Int, Any>()
+
     fun displayChart(
         chartType: String,
         cardView: View,
@@ -69,6 +73,8 @@ class ChartManager(private val context: Context) {
                 lineChart?.apply {
                     visibility = View.VISIBLE
                     setupLineChart(this, label, color, entries)
+                    // Cachear la configuración
+                    chartCache[sensorId] = LineChartConfig(chartType, entries, label, color)
                 }
             }
             "bar" -> {
@@ -76,6 +82,8 @@ class ChartManager(private val context: Context) {
                 barChart?.apply {
                     visibility = View.VISIBLE
                     setupBarChart(this, label, color, entries)
+                    // Cachear la configuración
+                    chartCache[sensorId] = BarChartConfig(chartType, entries, label, color)
                 }
             }
             "pie" -> {
@@ -83,6 +91,8 @@ class ChartManager(private val context: Context) {
                 pieChart?.apply {
                     visibility = View.VISIBLE
                     setupPieChart(this, label, entries, sensorId)
+                    // Cachear la configuración
+                    chartCache[sensorId] = PieChartConfig(chartType, entries, label, sensorId)
                 }
             }
             else -> {
@@ -90,6 +100,8 @@ class ChartManager(private val context: Context) {
                 lineChart?.apply {
                     visibility = View.VISIBLE
                     setupLineChart(this, label, color, entries)
+                    // Cachear la configuración
+                    chartCache[sensorId] = LineChartConfig(chartType, entries, label, color)
                 }
             }
         }
@@ -108,6 +120,7 @@ class ChartManager(private val context: Context) {
             }
         }
     }
+
     /**
      * Configura los datos y el estilo de la Gráfica de Línea.
      */
@@ -197,7 +210,8 @@ class ChartManager(private val context: Context) {
     }
 
     /**
-     * Obtiene el color principal del sensor usando ContextCompat para compatibilidad.
+     * 🔍 Obtiene el color principal del sensor usando ContextCompat para compatibilidad.
+     * Este es el método que necesitas para el error "Unresolved reference 'getSensorColor'"
      */
     fun getSensorColor(sensorId: Int): Int = ContextCompat.getColor(
         context, when (sensorId) {
@@ -207,4 +221,57 @@ class ChartManager(private val context: Context) {
             else -> R.color.teal_700 // Se usa un color por defecto o negro
         }
     )
+
+    /**
+     * 🔄 NUEVO: Limpiar caché de gráficas
+     */
+    fun clearChartCache() {
+        Log.d("ChartManager", "🧹 Limpiando caché de gráficas (${chartCache.size} elementos)")
+        chartCache.clear()
+    }
+
+    /**
+     * 🔄 NUEVO: Limpiar todo (caché y resetear gráficas si es necesario)
+     */
+    fun clearAll() {
+        Log.d("ChartManager", "🧹 Limpiando todo en ChartManager")
+        chartCache.clear()
+        // Aquí podrías agregar más limpiezas si es necesario
+    }
+
+    /**
+     * 🔍 Verificar si hay configuración cacheada para un sensor
+     */
+    fun hasCachedConfig(sensorId: Int): Boolean {
+        return chartCache.containsKey(sensorId)
+    }
+
+    /**
+     * 📊 Obtener configuración cacheada
+     */
+    fun getCachedConfig(sensorId: Int): Any? {
+        return chartCache[sensorId]
+    }
 }
+
+// Clases de datos para el caché
+private data class LineChartConfig(
+    val chartType: String,
+    val entries: List<Entry>,
+    val label: String,
+    val color: Int
+)
+
+private data class BarChartConfig(
+    val chartType: String,
+    val entries: List<Entry>,
+    val label: String,
+    val color: Int
+)
+
+private data class PieChartConfig(
+    val chartType: String,
+    val entries: List<Entry>,
+    val label: String,
+    val sensorId: Int
+)

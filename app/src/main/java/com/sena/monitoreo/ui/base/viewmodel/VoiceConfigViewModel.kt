@@ -1,5 +1,6 @@
 package com.sena.monitoreo.ui.base.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sena.monitoreo.data.model.voice.VoiceConfigResponse
@@ -17,6 +18,8 @@ import java.io.IOException
 class VoiceConfigViewModel(
     private val voiceRepository: VoiceRepository
 ) : ViewModel() {
+
+    private val TAG = "VoiceConfigViewModel"
 
     // --- Definición del Estado de UI (Necesario para el manejo de errores de red) ---
 
@@ -41,29 +44,74 @@ class VoiceConfigViewModel(
     val isLoading = _isLoading.asStateFlow()
 
     fun loadCurrentConfig() {
+        loadCurrentConfig(forceRefresh = false)
+    }
+
+    /**
+     * 🔄 MÉTODO ACTUALIZADO: Cargar configuración de voz
+     * @param forceRefresh Si es true, ignora cualquier caché y fuerza recarga desde API
+     */
+    fun loadCurrentConfig(forceRefresh: Boolean = false) {
         _isLoading.value = true
         _uiState.value = VoiceConfigUiState.Loading
+
         viewModelScope.launch {
             try {
-                when (val result = voiceRepository.getVoiceConfig()) {
+                Log.d(TAG, "🔄 Cargando configuración de voz (forceRefresh: $forceRefresh)")
+
+                when (val result = voiceRepository.getVoiceConfig(forceRefresh)) {
                     is ResultWrapper.Success -> {
                         _currentConfig.value = result.data
                         _uiState.value = VoiceConfigUiState.Success
+
+                        if (forceRefresh) {
+                            Log.d(TAG, "✅ Configuración de voz FORZADA recargada: " +
+                                    "Pitch=${result.data.voicePitch}, Gender=${result.data.voiceGender}")
+                        } else {
+                            Log.d(TAG, "✅ Configuración de voz cargada: " +
+                                    "Pitch=${result.data.voicePitch}, Gender=${result.data.voiceGender}")
+                        }
                     }
                     is ResultWrapper.Error -> {
-                        // Si es un error de servidor o lógico, lo reportamos al UI
-                        _uiState.value = VoiceConfigUiState.Error(result.message)
+                        val errorMsg = if (forceRefresh) {
+                            "Error forzando recarga de configuración: ${result.message}"
+                        } else {
+                            "Error cargando configuración: ${result.message}"
+                        }
+                        _uiState.value = VoiceConfigUiState.Error(errorMsg)
+                        Log.e(TAG, "❌ $errorMsg")
                     }
                 }
             } catch (e: IOException) {
-                // Error de red (Timeouts, no connection, etc.)
-                _uiState.value = VoiceConfigUiState.Error("Error de red: No se pudo conectar al servidor.")
+                val errorMsg = if (forceRefresh) {
+                    "Error de red forzando recarga: No se pudo conectar al servidor."
+                } else {
+                    "Error de red: No se pudo conectar al servidor."
+                }
+                _uiState.value = VoiceConfigUiState.Error(errorMsg)
+                Log.e(TAG, "❌ $errorMsg", e)
             } catch (e: Exception) {
-                // Error inesperado
-                _uiState.value = VoiceConfigUiState.Error("Error inesperado al cargar la configuración: ${e.message}")
+                val errorMsg = if (forceRefresh) {
+                    "Error inesperado forzando recarga: ${e.message}"
+                } else {
+                    "Error inesperado al cargar la configuración: ${e.message}"
+                }
+                _uiState.value = VoiceConfigUiState.Error(errorMsg)
+                Log.e(TAG, "❌ $errorMsg", e)
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    /**
+     * 🆕 MÉTODO ADICIONAL: Actualizar configuración localmente (para usar cuando cambia en otra pantalla)
+     */
+    fun updateLocalConfig(pitch: Double, gender: String) {
+        _currentConfig.value = VoiceConfigResponse(
+            voicePitch = pitch,
+            voiceGender = gender
+        )
+        Log.d(TAG, "🔄 Configuración local actualizada: Pitch=$pitch, Gender=$gender")
     }
 }

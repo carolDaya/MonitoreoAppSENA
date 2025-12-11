@@ -326,16 +326,18 @@ class AdminDashboardActivity : BaseVoiceActivity() {
         )
 
         binding.graficasAdminSection.btnChangeTemp.setOnClickListener {
-            chartManager.showGraphTypeDialog("Temperatura", binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp, 2)
+            // ❌ CAMBIAR de ID 2 a ID 3 para Temperatura
+            chartManager.showGraphTypeDialog("Temperatura", binding.graficasAdminSection.graphContainerTemp, binding.graficasAdminSection.btnChangeTemp, 3)
         }
         binding.graficasAdminSection.btnChangePressure.setOnClickListener {
-            chartManager.showGraphTypeDialog("Presión", binding.graficasAdminSection.graphContainerPressure, binding.graficasAdminSection.btnChangePressure, 3)
+            // ❌ CAMBIAR de ID 3 a ID 2 para Presión
+            chartManager.showGraphTypeDialog("Presión", binding.graficasAdminSection.graphContainerPressure, binding.graficasAdminSection.btnChangePressure, 2)
         }
         binding.graficasAdminSection.btnChangeGas.setOnClickListener {
+            // ✅ Gas Metano mantiene ID 1
             chartManager.showGraphTypeDialog("Metano", binding.graficasAdminSection.graphContainerGas, binding.graficasAdminSection.btnChangeGas, 1)
         }
     }
-
     // ----------------------------------------------------------
     // Lógica de Navegación (Solo cambia mensaje, NO habla automáticamente)
     // ----------------------------------------------------------

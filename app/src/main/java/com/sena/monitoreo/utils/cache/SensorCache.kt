@@ -1,4 +1,4 @@
-// Crear archivo: utils/cache/SensorCache.kt
+// utils/cache/SensorCache.kt
 package com.sena.monitoreo.utils.cache
 
 import com.sena.monitoreo.data.model.sensor.LecturaResponse
