@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.sena.monitoreo.data.exception.ApiException.NetworkError
+import com.sena.monitoreo.data.model.ai.AnalisisResponse
 import com.sena.monitoreo.data.repository.AnalisisRepository
 import com.sena.monitoreo.utils.ResultWrapper
 import kotlinx.coroutines.Job
@@ -14,7 +15,7 @@ import kotlinx.coroutines.launch
 class AlertManager(
     private val context: Context,
     private val analisisRepo: AnalisisRepository,
-    private val onAlertDetected: (String) -> Unit,
+    private val onAlertDetected: (AnalisisResponse) -> Unit,
     private val onError: (String) -> Unit
 ) {
     private val TAG = "AlertManager"
@@ -28,10 +29,6 @@ class AlertManager(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
-    /**
-     * Inicia la corrutina que verifica periódicamente si se debe lanzar una alerta.
-     * Utiliza un ámbito de Lifecycle para detenerse automáticamente si el dueño del ciclo de vida se destruye.
-     */
     fun startPeriodicAlertCheck(scope: LifecycleCoroutineScope) {
         alertCheckJob = scope.launch {
             while (true) {
@@ -42,70 +39,98 @@ class AlertManager(
         }
     }
 
-    /**
-     * Detiene la verificación periódica de alertas cancelando el Job de la corrutina.
-     */
     fun stopPeriodicAlertCheck() {
         alertCheckJob?.cancel()
         alertCheckJob = null
         Log.d(TAG, "Verificación periódica de alertas detenida.")
     }
 
-    /**
-     * Realiza la lógica de verificación: respeta el Cooldown y consulta la API si es necesario.
-     */
     suspend fun checkAndHandleAlert() {
         val lastAlertTimeMillis = prefs.getLong(KEY_LAST_ALERT_TIME, 0L)
         val currentTimeMillis = System.currentTimeMillis()
 
-        // Convertir la diferencia de tiempo a horas (en double para precisión)
         val hoursSinceLastAlert = (currentTimeMillis - lastAlertTimeMillis) / (1000.0 * 60 * 60)
-
-        // Solo verificar si nunca se ha hecho o si el tiempo de cooldown ha pasado
         val shouldCheck = lastAlertTimeMillis == 0L || hoursSinceLastAlert >= ALERT_COOLDOWN_HOURS
 
         if (shouldCheck) {
             Log.d(TAG, "Consultando backend para análisis...")
 
-            when (val analisisResult = analisisRepo.analizarLectura()) {
-                is ResultWrapper.Success -> {
-                    val analisis = analisisResult.data
+            try {
+                when (val analisisResult = analisisRepo.analizarLectura()) {
+                    is ResultWrapper.Success -> {
+                        val analisis = analisisResult.data
 
-                    // Verificar si la IA detectó una alerta (asumiendo 1 = Alerta activa)
-                    if (analisis.alerta_ia == 1) {
-                        Log.d(TAG, "Alerta activa detectada: ${analisis.mensaje_lectura}")
+                        // DEBUG COMPLETO DE LA RESPUESTA
+                        Log.d(TAG, "📊 RESPUESTA DEL BACKEND:")
+                        Log.d(TAG, "  alerta_ia: ${analisis.alerta_ia}")
+                        Log.d(TAG, "  tipo: ${analisis.alerta_ia?.javaClass?.simpleName}")
+                        Log.d(TAG, "  mensaje_lectura: ${analisis.mensaje_lectura}")
+                        Log.d(TAG, "  recomendacion: ${analisis.recomendacion}")
+                        Log.d(TAG, "  tipo_alerta_modelo: ${analisis.tipo_alerta_modelo}")
+                        Log.d(TAG, "  tipo_estado: ${analisis.tipo_estado}")
 
-                        // Guardar el tiempo para iniciar el cooldown
-                        prefs.edit().putLong(KEY_LAST_ALERT_TIME, currentTimeMillis).apply()
-                        onAlertDetected(analisis.mensaje_lectura)
-                    } else {
-                        Log.d(TAG, "Sistema normal. Sin alertas activas.")
+                        // VERIFICACIÓN MÁS FLEXIBLE
+                        val isAlert = when {
+                            // Caso 1: alerta_ia como Int
+                            analisis.alerta_ia == 1 -> {
+                                Log.d(TAG, "✅ alerta_ia == 1 (Int)")
+                                true
+                            }
+                            // Caso 3: Si tiene mensaje de alerta en tipo_estado
+                            analisis.tipo_estado?.contains("Alerta", ignoreCase = true) == true -> {
+                                Log.d(TAG, "✅ tipo_estado contiene 'Alerta'")
+                                true
+                            }
+                            // Caso 4: Si tiene "Anormal" en tipo_alerta_modelo
+                            analisis.tipo_alerta_modelo?.contains("Anormal", ignoreCase = true) == true -> {
+                                Log.d(TAG, "✅ tipo_alerta_modelo contiene 'Anormal'")
+                                true
+                            }
+                            // Caso 5: Si hay recomendación (indicativo de alerta)
+                            !analisis.recomendacion.isNullOrEmpty() &&
+                                    analisis.recomendacion != "Sin recomendaciones" -> {
+                                Log.d(TAG, "✅ Tiene recomendación: ${analisis.recomendacion}")
+                                true
+                            }
+                            else -> {
+                                Log.d(TAG, "❌ No cumple criterios de alerta")
+                                false
+                            }
+                        }
+
+                        if (isAlert) {
+                            Log.d(TAG, "🚨 ALERTA DETECTADA! Enviando notificación...")
+
+                            // Guardar el tiempo para iniciar el cooldown
+                            prefs.edit().putLong(KEY_LAST_ALERT_TIME, currentTimeMillis).apply()
+
+                            // Enviar alerta
+                            onAlertDetected(analisis)
+                        } else {
+                            Log.d(TAG, "✅ Sistema normal. alerta_ia=${analisis.alerta_ia}")
+                        }
+                    }
+                    is ResultWrapper.Error -> {
+                        val errorType = if (analisisResult.exception is NetworkError) "RED" else "API"
+                        Log.e(TAG, "❌ Error de $errorType: ${analisisResult.message}")
+                        onError(analisisResult.message)
                     }
                 }
-                is ResultWrapper.Error -> {
-                    // Usar la jerarquía de ApiException para determinar el tipo de error
-                    val errorType = if (analisisResult.exception is NetworkError) "RED/DESCONEXIÓN" else "API"
-                    Log.e(TAG, "Error de $errorType: ${analisisResult.message}")
-                    onError(analisisResult.message)
-                }
+            } catch (e: Exception) {
+                Log.e(TAG, "💥 Excepción en checkAndHandleAlert: ${e.message}", e)
+                onError("Error interno: ${e.message}")
             }
         } else {
             val remainingHours = ALERT_COOLDOWN_HOURS - hoursSinceLastAlert
-            Log.d(TAG, "Cooldown activo. Faltan ${"%.2f".format(remainingHours)} horas.")
+            Log.d(TAG, "⏳ Cooldown activo. Faltan ${"%.2f".format(remainingHours)} horas.")
         }
     }
 
-    /**
-     * Elimina el registro de la última alerta para forzar la siguiente verificación.
-     */
     fun resetCooldown() {
         prefs.edit().remove(KEY_LAST_ALERT_TIME).apply()
         Log.d(TAG, "Cooldown reseteado")
     }
 
-    /**
-     * Fuerza una verificación de alerta inmediatamente, reseteando el cooldown.
-     */
     fun forceAlertCheck(scope: LifecycleCoroutineScope) {
         scope.launch {
             resetCooldown()

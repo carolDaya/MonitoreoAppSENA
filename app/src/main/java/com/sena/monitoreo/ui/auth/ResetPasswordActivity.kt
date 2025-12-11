@@ -108,12 +108,13 @@ class ResetPasswordActivity : BaseActivity() {
                     UiUtils.showSnackbar(containerView, "Por favor, completa ambos campos", isError = true)
                 }
                 newPass.length < 6 -> {
-                    layoutNewPassword.error = "La contraseña debe tener al menos 6 caracteres"
+                    UiUtils.showSnackbar(containerView, "las contraseñas deben de tener al menos 6 caracteres", isError = true)
                 }
                 newPass != confirmPass -> {
-                    layoutConfirmPassword.error = "Las contraseñas no coinciden"
+                    UiUtils.showSnackbar(containerView, "las contraseñas no coinciden", isError = true)
                 }
                 else -> {
+                    UiUtils.showSnackbar(containerView, "contraseña actualizada")
                     viewModel.updatePassword(phoneNumber, newPass, confirmPass)
                 }
             }

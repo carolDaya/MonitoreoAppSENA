@@ -25,10 +25,6 @@ class ForgotPasswordViewModel(
                 _uiState.value = ForgotPasswordUiState.ValidationError("Ingresa tu número de teléfono")
                 return
             }
-            phone.length != 10 -> {
-                _uiState.value = ForgotPasswordUiState.ValidationError("El teléfono debe tener 10 dígitos")
-                return
-            }
             !phone.all { it.isDigit() } -> {
                 _uiState.value = ForgotPasswordUiState.ValidationError("Solo se permiten números")
                 return

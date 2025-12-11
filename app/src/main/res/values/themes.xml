@@ -58,7 +58,8 @@
     </style>
 
     <style name="Widget.App.TextInputLayout.OutlinedBox.Green" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-        <item name="hintTextColor">@color/black</item>
+        <!-- CAMBIA ESTO: usa un color FIJO gris oscuro que funcione en ambos modos -->
+        <item name="hintTextColor">#757575</item> <!-- Color FIJO, no referenciado a variable -->
         <item name="boxStrokeColor">@color/green_icon</item>
         <item name="android:textColor">@color/black</item>
         <item name="startIconTint">@color/green_icon</item>

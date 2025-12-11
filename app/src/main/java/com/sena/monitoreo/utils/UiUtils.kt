@@ -11,6 +11,7 @@ import android.view.View
 import android.view.Window
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.github.ybq.android.spinkit.SpinKitView
 import com.github.ybq.android.spinkit.style.Circle
@@ -65,6 +66,32 @@ object UiUtils {
             }
         }
     }
+
+    fun showTooltip(anchor: View, message: String, isError: Boolean = false): Toast {
+        val toast = Toast(anchor.context)
+        val layout = LinearLayout(anchor.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(35, 20, 35, 20)
+            background = ContextCompat.getDrawable(
+                context,
+                if (isError) R.drawable.bg_tooltip_error else R.drawable.bg_tooltip_normal
+            )
+
+            val textView = TextView(context).apply {
+                text = message
+                setTextColor(Color.WHITE)
+                textSize = 14f
+            }
+            addView(textView)
+        }
+
+        toast.view = layout
+        toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 180)
+        toast.duration = Toast.LENGTH_LONG
+        toast.show()
+        return toast
+    }
+
 
     fun hideLoading() {
         loadingJob?.cancel()

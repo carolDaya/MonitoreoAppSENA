@@ -74,11 +74,9 @@ class ForgotPasswordActivity : BaseActivity() {
             phone.isEmpty() -> {
                 binding.textInputLayoutPhone.error = null
             }
-            phone.length != 10 -> {
-                binding.textInputLayoutPhone.error = "El teléfono debe tener 10 dígitos"
-            }
+
             !phone.all { it.isDigit() } -> {
-                binding.textInputLayoutPhone.error = "Solo se permiten números"
+                UiUtils.showSnackbar(binding.containerForgot, "solo se permiten números", isError=true)
             }
             else -> {
                 binding.textInputLayoutPhone.error = null

@@ -27,11 +27,15 @@ class HomeUserActivity : BaseVoiceActivity() {
     // Repositorio
     private val voiceRepo = VoiceRepository(RetrofitClient.apiVoice)
 
-    // ViewModel (Usando VoiceConfigViewModel y su Factory)
+    // ViewModel
     private val viewModel: VoiceConfigViewModel by lazy {
         val factory = VoiceConfigViewModelFactory(voiceRepo)
         ViewModelProvider(this, factory)[VoiceConfigViewModel::class.java]
     }
+
+    // Variables para control rápido
+    private var isTtsReadyForImmediateUse = false
+    private val welcomeMessage = "Bienvenido al sistema de monitoreo de biodigestores"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,15 +44,33 @@ class HomeUserActivity : BaseVoiceActivity() {
         setContentView(binding.root)
 
         setupNavigation()
-        setupVoiceConfiguration()
 
-        // Iniciar la carga de la configuración de voz
+        // 1️⃣ CONFIGURACIÓN POR DEFECTO INMEDIATA (sin esperar red)
+        voiceManager.currentPitch = 1.0f
+        voiceManager.currentGender = "FEMALE"
+
+        setupWaveformComponents(
+            binding.mainHeader.waveformSection.waveformSeekBar,
+            binding.mainHeader.waveformSection.btnPlayMessage
+        )
+
+        // 2️⃣ Cargar configuración en background (no bloqueante)
         viewModel.loadCurrentConfig()
+
+        // 3️⃣ Configurar botón para respuesta ULTRA-RÁPIDA
+        binding.mainHeader.waveformSection.btnPlayMessage.setOnClickListener {
+            handlePlayButtonClick()
+        }
+
+        // 4️⃣ Observar cambios de configuración (en background)
+        setupVoiceConfigurationAsync()
+
+        // 5️⃣ Mostrar ayudita visual
+        showHelpTooltip()
     }
 
     override fun onNetworkRetry() {
         Log.d(TAG, "onNetworkRetry: Reintentando carga de configuración de voz.")
-        // Reintentar la carga de la configuración de voz
         viewModel.loadCurrentConfig()
     }
 
@@ -68,68 +90,123 @@ class HomeUserActivity : BaseVoiceActivity() {
         navigationManager.setupNavigation("home")
     }
 
-    private fun setupVoiceConfiguration() {
-        setupWaveformComponents(
-            binding.mainHeader.waveformSection.waveformSeekBar,
-            binding.mainHeader.waveformSection.btnPlayMessage
-        )
-
-        // Observar el estado de la UI (errores de red/lógicos)
+    /**
+     * Configuración ASINCRONA - No bloquea la UI principal
+     */
+    private fun setupVoiceConfigurationAsync() {
         lifecycleScope.launch {
-            viewModel.uiState.collectLatest { state ->
-                when (state) {
-                    VoiceConfigViewModel.VoiceConfigUiState.Loading -> {
-                        // Opcional: mostrar un indicador de carga
-                    }
-                    is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
-                        Log.e(TAG, "Error de Config. Voz: ${state.message}")
-                        if (state.message.contains("Error de red", ignoreCase = true) ||
-                            state.message.contains("IOException", ignoreCase = true)) {
-                            showNetworkError(state.message)
-                        } else {
-                            // Mostrar otros errores como snackbar
-                            UiUtils.showSnackbar(binding.root, state.message, isError = true)
-                        }
-                    }
-                    VoiceConfigViewModel.VoiceConfigUiState.Success -> {
-                        // Éxito en la carga - no necesita acción específica
-                    }
-                    VoiceConfigViewModel.VoiceConfigUiState.Idle -> {}
+            viewModel.currentConfig.collectLatest { config ->
+                // Actualizar configuración cuando llegue
+                voiceManager.currentPitch = config.voicePitch.toFloat()
+                voiceManager.currentGender = config.voiceGender
+
+                // Si TTS ya está listo, aplicar inmediatamente
+                if (isVoiceInitialized) {
+                    voiceManager.applyTtsSettings()
+                    Log.d(TAG, "⚡ Configuración del servidor aplicada")
                 }
             }
         }
 
-        // Observar la configuración (datos)
         lifecycleScope.launch {
-            viewModel.currentConfig.collectLatest { config ->
-                voiceManager.currentPitch = config.voicePitch.toFloat()
-                voiceManager.currentGender = config.voiceGender
-
-                // Aplicar configuración solo si la Activity ya terminó de inicializar el TTS
-                if (isVoiceInitialized) {
-                    voiceManager.applyTtsSettings()
+            viewModel.uiState.collectLatest { state ->
+                when (state) {
+                    is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
+                        // Solo manejar errores críticos
+                        if (state.message.contains("Error de red", ignoreCase = true)) {
+                            Log.w(TAG, "Usando configuración por defecto por error de red")
+                        }
+                    }
+                    else -> {}
                 }
             }
         }
     }
 
     override fun onVoiceInitialized() {
-        // Se llama cuando el motor TTS de Android está listo.
-        // Aplicamos la configuración que ya pudimos haber cargado del servidor.
-        viewModel.currentConfig.value.let { config ->
-            voiceManager.currentPitch = config.voicePitch.toFloat()
-            voiceManager.currentGender = config.voiceGender
-            voiceManager.applyTtsSettings()
-        }
+        Log.d(TAG, "✅ TTS INICIALIZADO - Listo para usar")
 
-        // Reproducir mensaje de bienvenida
-        startSpeaking()
+        // 1. Aplicar configuración actual inmediatamente
+        voiceManager.applyTtsSettings()
+
+        // 2. Marcar que TTS está listo para uso inmediato
+        isTtsReadyForImmediateUse = true
+
+        // 3. Pre-cargar mensaje (opcional, para mayor velocidad)
+        lifecycleScope.launch {
+            // Pequeño delay para asegurar que TTS esté completamente listo
+            kotlinx.coroutines.delay(100)
+            Log.d(TAG, "🔊 TTS completamente listo para respuesta instantánea")
+        }
     }
 
-    override fun startSpeaking() {
-        super.startSpeaking()
-        val message = getString(R.string.welcome_message)
-        speakWithWaveform(message)
+    /**
+     * Manejo ULTRA-RÁPIDO del click del botón
+     */
+    private fun handlePlayButtonClick() {
+        if (!isVoiceInitialized) {
+            Log.w(TAG, "⏳ TTS aún no inicializado, mostrando mensaje...")
+            UiUtils.showSnackbar(binding.root, "Inicializando voz... por favor espera", false)
+            return
+        }
+
+        if (voiceManager.isSpeaking) {
+            // Si ya está hablando, detener
+            stopSpeaking()
+            return
+        }
+
+        Log.d(TAG, "🎯 Botón presionado - Respuesta INMEDIATA")
+
+        // 1. Cambiar icono inmediatamente (feedback visual)
+        binding.mainHeader.waveformSection.btnPlayMessage.setIconResource(R.drawable.ic_stop)
+
+        // 2. Hablar SIN delays
+        speakImmediately()
+    }
+
+    /**
+     * Hablar inmediatamente sin procesos adicionales
+     */
+    private fun speakImmediately() {
+        try {
+            // Mensaje corto y directo
+            val message = getString(R.string.welcome_message)
+
+            // Configurar callbacks para UI
+            voiceManager.setOnUtteranceCompletedListener {
+                lifecycleScope.launch {
+                    kotlinx.coroutines.delay(200)
+                    binding.mainHeader.waveformSection.btnPlayMessage.setIconResource(R.drawable.ic_play)
+                }
+            }
+
+            voiceManager.setOnSpeechStartedListener {
+                lifecycleScope.launch {
+                    waveformManager.startContinuousAnimation(this) {
+                        Log.d(TAG, "Waveform completado")
+                    }
+                }
+            }
+
+            // Hablar INMEDIATAMENTE
+            voiceManager.speak(message)
+
+            Log.d(TAG, "🔊 Hablando inmediatamente: ${message.length} caracteres")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al hablar: ${e.message}")
+            binding.mainHeader.waveformSection.btnPlayMessage.setIconResource(R.drawable.ic_play)
+        }
+    }
+
+    // 🎈 Tooltip / Ayudita visual
+    private fun showHelpTooltip() {
+        UiUtils.showTooltip(
+            anchor = binding.mainHeader.waveformSection.btnPlayMessage,
+            message = "Presiona para escuchar el mensaje de bienvenida",
+            isError = false
+        )
     }
 
     override fun onBackPressed() {
@@ -137,6 +214,16 @@ class HomeUserActivity : BaseVoiceActivity() {
             binding.homeAdmin.closeDrawer(GravityCompat.START)
         } else {
             super.onBackPressed()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        // Verificar si TTS está listo cuando se vuelve a la actividad
+        if (isVoiceInitialized && !isTtsReadyForImmediateUse) {
+            isTtsReadyForImmediateUse = true
+            Log.d(TAG, "🔄 TTS re-activado para respuesta rápida")
         }
     }
 }

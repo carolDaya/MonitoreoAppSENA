@@ -1,5 +1,6 @@
 package com.sena.monitoreo.ui.auth
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
@@ -35,15 +36,54 @@ class SignupActivity : BaseActivity() {
         binding = ActivitySignupBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-
         ViewCompat.setOnApplyWindowInsetsListener(binding.containerSignup) { view, insets ->
             val systemBarsInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.setPadding(systemBarsInsets.left, systemBarsInsets.top, systemBarsInsets.right, systemBarsInsets.bottom)
             insets
         }
 
+        // SOLUCIÓN: Forzar colores después de que la UI esté lista
+        binding.root.post {
+            forceDarkHintColors()
+        }
+
         setupClickListeners()
         observeUiState()
+    }
+
+    /**
+     * SOLUCIÓN DEFINITIVA - Simple y sin errores
+     */
+    private fun forceDarkHintColors() {
+        try {
+            // Color NEGRO PURO - Esto SÍ se verá sobre fondo claro
+            val blackColor = Color.BLACK
+
+            // 1. APLICAR DIRECTAMENTE A LOS EDITTEXTS
+            binding.editTextName.setHintTextColor(blackColor)
+            binding.editTextPhone.setHintTextColor(blackColor)
+            binding.inputPassword.setHintTextColor(blackColor)
+            binding.inputConfirmPassword.setHintTextColor(blackColor)
+
+            // 2. También usar ColorStateList para los TextInputLayouts
+            val colorStateList = android.content.res.ColorStateList.valueOf(blackColor)
+
+            binding.textInputLayoutName.setHintTextColor(colorStateList)
+            binding.textInputLayoutPhone.setHintTextColor(colorStateList)
+            binding.inputPasswordLayout.setHintTextColor(colorStateList)
+            binding.textInputLayoutConfirmPassword.setHintTextColor(colorStateList)
+
+            // 3. Segundo intento después de un pequeño delay (por si acaso)
+            binding.root.postDelayed({
+                binding.editTextName.setHintTextColor(blackColor)
+                binding.editTextPhone.setHintTextColor(blackColor)
+                binding.inputPassword.setHintTextColor(blackColor)
+                binding.inputConfirmPassword.setHintTextColor(blackColor)
+            }, 50)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onNetworkRetry() {

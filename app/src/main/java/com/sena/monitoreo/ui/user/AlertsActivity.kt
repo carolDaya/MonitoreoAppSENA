@@ -1,5 +1,7 @@
 package com.sena.monitoreo.ui.user
 
+import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.enableEdgeToEdge
@@ -7,7 +9,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import com.sena.monitoreo.R
 import com.sena.monitoreo.data.api.RetrofitClient
+import com.sena.monitoreo.data.model.ai.AnalisisResponse
 import com.sena.monitoreo.data.repository.AnalisisRepository
 import com.sena.monitoreo.data.repository.VoiceRepository
 import com.sena.monitoreo.databinding.ActivityAlertsBinding
@@ -17,6 +21,7 @@ import com.sena.monitoreo.ui.base.viewmodel.VoiceConfigViewModel
 import com.sena.monitoreo.utils.ResultWrapper
 import com.sena.monitoreo.utils.UiUtils
 import com.sena.monitoreo.utils.alerts.AlertManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -37,7 +42,7 @@ class AlertsActivity : BaseVoiceActivity() {
 
     // Variables para almacenar TODOS los datos de la alerta
     private var fullAlertMessage: String = ""
-    private var alertData: com.sena.monitoreo.data.model.ai.AnalisisResponse? = null
+    private var alertData: AnalisisResponse? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,12 +56,38 @@ class AlertsActivity : BaseVoiceActivity() {
             insets
         }
 
+        // VERIFICAR SI VIENE CON DATOS COMPLETOS DEL INTENT
+        val alertDataFromIntent = intent.getSerializableExtra("alert_data") as? AnalisisResponse
+        if (alertDataFromIntent != null) {
+            Log.d(TAG, "✅ Datos COMPLETOS recibidos del intent")
+            Log.d(TAG, "- mensaje_lectura: ${alertDataFromIntent.mensaje_lectura}")
+            Log.d(TAG, "- recomendacion: ${alertDataFromIntent.recomendacion}")
+            Log.d(TAG, "- tipo_estado: ${alertDataFromIntent.tipo_estado}")
+            Log.d(TAG, "- tipo_alerta_modelo: ${alertDataFromIntent.tipo_alerta_modelo}")
+
+            handleAlertData(alertDataFromIntent) // Usar datos directamente
+            initializeManagers()
+            setupVoiceConfiguration()
+            setupUI()
+            return // NO cargar desde red si ya tenemos datos
+        }
+
+        // Si no hay datos en el intent, verificar mensaje simple
+        val alertMessageFromIntent = intent.getStringExtra("alert_message")
+        if (!alertMessageFromIntent.isNullOrEmpty()) {
+            Log.d(TAG, "⚠️ Solo mensaje recibido del intent")
+            binding.iaResponseText.text = alertMessageFromIntent
+            fullAlertMessage = alertMessageFromIntent
+        }
+
         initializeManagers()
         setupVoiceConfiguration()
         setupUI()
 
-        // CARGAR DATOS COMPLETOS DE LA ALERTA
-        loadAlertData()
+        // Solo cargar datos si no vinieron del intent
+        if (alertDataFromIntent == null && alertMessageFromIntent == null) {
+            loadAlertData()
+        }
     }
 
     override fun onNetworkRetry() {
@@ -71,12 +102,13 @@ class AlertsActivity : BaseVoiceActivity() {
         alertManager = AlertManager(
             context = this,
             analisisRepo = analisisRepo,
-            onAlertDetected = { _ -> /* No necesario aquí */ },
+            onAlertDetected = { _ -> /* No necesario aquí ya que estamos en la activity de alerta */ },
             onError = { errorMessage ->
                 runOnUiThread {
                     // Solo mostrar snackbar si no es un error de red
                     if (!errorMessage.contains("Error de red", ignoreCase = true) &&
-                        !errorMessage.contains("IOException", ignoreCase = true)) {
+                        !errorMessage.contains("IOException", ignoreCase = true)
+                    ) {
                         UiUtils.showSnackbar(binding.root, "Error: $errorMessage", true)
                     }
                 }
@@ -97,7 +129,10 @@ class AlertsActivity : BaseVoiceActivity() {
         // 2. Observar cambios de configuración de manera CENTRALIZADA
         lifecycleScope.launch {
             voiceConfigViewModel.currentConfig.collectLatest { config ->
-                Log.d(TAG, "Nueva configuración de voz recibida: ${config.voiceGender}, pitch: ${config.voicePitch}")
+                Log.d(
+                    TAG,
+                    "Nueva configuración de voz recibida: ${config.voiceGender}, pitch: ${config.voicePitch}"
+                )
 
                 // Aplicar configuración inmediatamente
                 voiceManager.currentPitch = config.voicePitch.toFloat()
@@ -118,15 +153,19 @@ class AlertsActivity : BaseVoiceActivity() {
                     is VoiceConfigViewModel.VoiceConfigUiState.Error -> {
                         Log.e(TAG, "Error de Config. Voz: ${state.message}")
                         if (state.message.contains("Error de red", ignoreCase = true) ||
-                            state.message.contains("IOException", ignoreCase = true)) {
+                            state.message.contains("IOException", ignoreCase = true)
+                        ) {
                             showNetworkError(state.message)
                         } else {
                             // Mostrar otros errores como snackbar
                             UiUtils.showSnackbar(binding.root, state.message, true)
                         }
                     }
+
                     VoiceConfigViewModel.VoiceConfigUiState.Success -> {
+                        // Éxito, no hacer nada especial
                     }
+
                     else -> {}
                 }
             }
@@ -140,11 +179,13 @@ class AlertsActivity : BaseVoiceActivity() {
             finish()
         }
 
-        // Verificar si llegamos con un mensaje de alerta desde SensorDataActivity
-        val alertMessageFromIntent = intent.getStringExtra("alert_message")
-        if (!alertMessageFromIntent.isNullOrEmpty()) {
-            binding.iaResponseText.text = alertMessageFromIntent
-            fullAlertMessage = alertMessageFromIntent
+        // Configurar el botón de play/pause del waveform
+        binding.waveformSection.btnPlayMessage.setOnClickListener {
+            if (!voiceManager.isSpeaking) {
+                startSpeaking()
+            } else {
+                stopSpeaking()
+            }
         }
     }
 
@@ -152,7 +193,6 @@ class AlertsActivity : BaseVoiceActivity() {
      * Carga los datos completos de la alerta desde el backend o maneja el error.
      */
     private fun loadAlertData() {
-        // Bloquear si ya tenemos mensaje
         if (fullAlertMessage.isNotEmpty()) {
             return
         }
@@ -161,68 +201,118 @@ class AlertsActivity : BaseVoiceActivity() {
             UiUtils.showLoading(this@AlertsActivity, "Cargando alerta...")
 
             try {
+                Log.d(TAG, "🔄 Consultando backend para análisis...")
                 val analisisResult = analisisRepo.analizarLectura()
 
                 when (analisisResult) {
                     is ResultWrapper.Success -> {
                         val analisis = analisisResult.data
+                        Log.d(TAG, "📦 Respuesta recibida del backend")
+                        Log.d(TAG, "  alerta_ia: ${analisis.alerta_ia}")
+                        Log.d(TAG, "  tipo_estado: ${analisis.tipo_estado}")
+                        Log.d(TAG, "  mensaje: ${analisis.mensaje_lectura}")
 
-                        if (analisis.alerta_ia == 1) {
+                        // Verificar alerta de múltiples formas
+                        val isAlert = when {
+                            analisis.alerta_ia == 1 -> true
+                            analisis.tipo_estado?.contains("Alerta", ignoreCase = true) == true -> true
+                            analisis.tipo_estado?.contains("Crítico", ignoreCase = true) == true -> true
+                            analisis.tipo_estado?.contains("Anormal", ignoreCase = true) == true -> true
+                            else -> false
+                        }
+
+                        if (isAlert) {
+                            Log.d(TAG, "✅ CONDICIÓN DE ALERTA CUMPLIDA")
                             handleAlertData(analisis)
                         } else {
+                            Log.d(TAG, "❌ NO es alerta. alerta_ia=${analisis.alerta_ia}")
                             handleNoActiveAlerts()
                         }
                     }
                     is ResultWrapper.Error -> {
                         val errorMsg = analisisResult.message ?: "Error desconocido"
+                        Log.e(TAG, "❌ Error en la respuesta: $errorMsg")
                         handleError(errorMsg)
                         if (errorMsg.contains("Error de red", ignoreCase = true) ||
                             errorMsg.contains("IOException", ignoreCase = true)) {
                             showNetworkError(errorMsg)
+                        } else {
+
                         }
                     }
                 }
             } catch (e: Exception) {
                 val errorMsg = "Error inesperado: ${e.message}"
+                Log.e(TAG, "💥 Excepción: $errorMsg", e)
                 handleError(errorMsg)
                 if (errorMsg.contains("Error de red", ignoreCase = true) ||
                     errorMsg.contains("IOException", ignoreCase = true)) {
                     showNetworkError(errorMsg)
+                } else {
+
                 }
             } finally {
                 UiUtils.hideLoading()
             }
         }
     }
-
     private fun handleAlertData(analisis: com.sena.monitoreo.data.model.ai.AnalisisResponse) {
         alertData = analisis
 
-        val tipoEstado = analisis.tipo_estado ?: "Estado desconocido"
-        val tipoAlerta = analisis.tipo_alerta_modelo ?: "Alerta general"
-        val recomendacion = analisis.recomendacion ?: "Sin recomendaciones"
+        // DEBUG: Verificar TODOS los campos
+        Log.d(TAG, "DEBUG - AnalisisResponse recibido:")
+        Log.d(TAG, "  alerta_ia: ${analisis.alerta_ia} (tipo: ${analisis.alerta_ia?.javaClass?.simpleName})")
+        Log.d(TAG, "  mensaje_lectura: ${analisis.mensaje_lectura}")
+        Log.d(TAG, "  recomendacion: ${analisis.recomendacion}")
+        Log.d(TAG, "  tipo_alerta_modelo: ${analisis.tipo_alerta_modelo}")
+        Log.d(TAG, "  tipo_estado: ${analisis.tipo_estado}")
 
-        val displayText = buildString {
-            appendLine("-$tipoEstado")
-            appendLine()
-            appendLine("-Tipo de Alerta: $tipoAlerta")
-            appendLine()
-            appendLine("-Recomendación:")
-            appendLine(recomendacion)
+        // Verificar de diferentes formas
+        val isAlert = when {
+            analisis.alerta_ia == 1 -> true
+            analisis.tipo_estado?.contains("Alerta", ignoreCase = true) == true -> true
+            analisis.tipo_alerta_modelo?.contains("Anormal", ignoreCase = true) == true -> true
+            else -> false
         }
 
-        binding.iaResponseText.text = displayText
+        if (isAlert) {
+            // Mostrar alerta completa
+            val displayText = buildString {
+                analisis.tipo_estado?.let {
+                    appendLine(" $it ")
+                    appendLine()
+                }
 
-        fullAlertMessage = formatAnalysisMessage(analisis)
+                analisis.tipo_alerta_modelo?.let {
+                    appendLine("Tipo de Alerta: $it")
+                    appendLine()
+                }
 
-        Log.d(TAG, "Alerta cargada: $tipoEstado")
+                analisis.mensaje_lectura?.let {
+                    appendLine("Lectura de Sensores:")
+                    appendLine(it)
+                    appendLine()
+                }
 
-        // Reproducir automáticamente cuando la voz esté lista
-        if (isVoiceReady()) {
-            startAutoPlay()
+                analisis.recomendacion?.let {
+                    appendLine("Recomendación:")
+                    appendLine(it)
+                }
+            }
+
+            binding.iaResponseText.text = displayText
+            fullAlertMessage = formatAnalysisMessageForTTS(analisis)
+
+            Log.d(TAG, "ALERTA DETECTADA: $displayText")
+
+            if (isVoiceReady()) {
+                startAutoPlay()
+            }
+        } else {
+            Log.w(TAG, "Backend dice alerta_ia=1 pero no se detectó como alerta")
+            handleNoActiveAlerts()
         }
     }
-
     private fun handleNoActiveAlerts() {
         val fallbackMessage = "No hay alertas activas en este momento"
         binding.iaResponseText.text = fallbackMessage
@@ -237,7 +327,8 @@ class AlertsActivity : BaseVoiceActivity() {
             fullAlertMessage = errorMessage
             // Solo mostrar snackbar si no es un error de red
             if (!errorMessage.contains("Error de red", ignoreCase = true) &&
-                !errorMessage.contains("IOException", ignoreCase = true)) {
+                !errorMessage.contains("IOException", ignoreCase = true)
+            ) {
                 UiUtils.showSnackbar(binding.root, errorMessage, true)
             }
         }
@@ -247,14 +338,17 @@ class AlertsActivity : BaseVoiceActivity() {
         // Cuando la voz esté lista, SINCRONIZAR configuración actual
         lifecycleScope.launch {
             // Pequeño delay para asegurar que TTS esté completamente listo
-            kotlinx.coroutines.delay(100)
+            delay(100)
 
             // Forzar aplicación de settings actuales
             voiceConfigViewModel.currentConfig.value?.let { config ->
                 voiceManager.currentPitch = config.voicePitch.toFloat()
                 voiceManager.currentGender = config.voiceGender
                 voiceManager.applyTtsSettings()
-                Log.d(TAG, "Configuración sincronizada en onVoiceInitialized: ${config.voiceGender}")
+                Log.d(
+                    TAG,
+                    "Configuración sincronizada en onVoiceInitialized: ${config.voiceGender}"
+                )
             }
 
             // Solo entonces reproducir si hay mensaje
@@ -267,7 +361,7 @@ class AlertsActivity : BaseVoiceActivity() {
     private fun startAutoPlay() {
         // Pequeño delay para mejor UX
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(500)
+            delay(500)
             startSpeaking()
         }
     }
@@ -276,7 +370,8 @@ class AlertsActivity : BaseVoiceActivity() {
         // VERIFICAR configuración actual antes de hablar
         voiceConfigViewModel.currentConfig.value?.let { config ->
             if (voiceManager.currentGender != config.voiceGender ||
-                voiceManager.currentPitch != config.voicePitch.toFloat()) {
+                voiceManager.currentPitch != config.voicePitch.toFloat()
+            ) {
 
                 Log.w(TAG, "Configuración desincronizada, re-aplicando...")
                 voiceManager.currentPitch = config.voicePitch.toFloat()
@@ -287,14 +382,58 @@ class AlertsActivity : BaseVoiceActivity() {
 
         super.startSpeaking()
 
-        if (alertData != null) {
-            val fullMessage = formatAnalysisMessage(alertData!!)
-            speakWithPausesAndWaveform(fullMessage)
-            Log.d(TAG, "Reproduciendo mensaje largo con waveform continuo: ${fullMessage.length} caracteres")
+        // Preparar mensaje para TTS
+        val ttsMessage = if (alertData != null) {
+            formatAnalysisMessageForTTS(alertData!!)
         } else if (fullAlertMessage.isNotEmpty()) {
-            speakWithPausesAndWaveform(fullAlertMessage)
-            Log.d(TAG, "Reproduciendo mensaje del intent con waveform continuo: ${fullAlertMessage.length} caracteres")
+            fullAlertMessage
+        } else {
+            "No hay mensaje de alerta disponible"
         }
+
+        Log.d(TAG, "Iniciando reproducción de TTS: ${ttsMessage.length} caracteres")
+
+        // Usar el método de la clase base para hablar con waveform
+        speakWithPausesAndWaveform(ttsMessage)
+    }
+
+    /**
+     * Formatea el mensaje para TTS (más simple y fluido)
+     */
+    private fun formatAnalysisMessageForTTS(analisis: AnalisisResponse): String {
+        return buildString {
+            // Versión más corta y fluida para TTS
+            analisis.tipo_estado?.let {
+                append("$it. ")
+            }
+
+            analisis.mensaje_lectura?.let {
+                // Simplificar mensaje de lectura para TTS
+                val simplified = it
+                    .replace("°C", " grados Celsius")
+                    .replace("kPa", " kilo pascales")
+                    .replace("ppm", " partes por millón")
+                    .replace("|", " y ")
+                append("$simplified. ")
+            }
+
+            analisis.recomendacion?.let {
+                append("Recomendación: $it. ")
+            }
+
+            analisis.tipo_alerta_modelo?.let {
+                append("Tipo de alerta: $it. ")
+            }
+
+            analisis.dia_proceso?.let {
+                append("Día del proceso: $it. ")
+            }
+
+            // Añadir indicador de que es una alerta importante
+            if (analisis.alerta_ia == 1) {
+                append("Esta es una alerta crítica que requiere atención inmediata.")
+            }
+        }.trim().ifEmpty { "Información de alerta no disponible." }
     }
 
     override fun onBackPressed() {

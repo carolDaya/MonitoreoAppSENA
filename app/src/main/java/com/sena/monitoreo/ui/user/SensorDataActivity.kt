@@ -234,9 +234,9 @@ class SensorDataActivity : BaseVoiceActivity() {
         alertManager = AlertManager(
             context = this,
             analisisRepo = analisisRepo,
-            onAlertDetected = { alertMessage ->
+            onAlertDetected = { analisis -> // CAMBIADO: Recibe objeto completo
                 runOnUiThread {
-                    showAlert(alertMessage)
+                    showAlert(analisis) // Pasa el objeto completo
                     speakWithWaveform("Alerta crítica detectada")
                 }
             },
@@ -251,6 +251,24 @@ class SensorDataActivity : BaseVoiceActivity() {
         )
     }
 
+    // Actualiza el método showAlert para pasar el objeto completo:
+    private fun showAlert(analisis: AnalisisResponse) {
+        // Formatear mensaje completo
+        val alertMessage = buildString {
+            appendLine("🚨 ${analisis.tipo_estado} 🚨")
+            appendLine()
+            appendLine("📊 ${analisis.mensaje_lectura}")
+            appendLine()
+            appendLine("💡 ${analisis.recomendacion}")
+            appendLine()
+            appendLine("📌 Tipo: ${analisis.tipo_alerta_modelo}")
+        }
+
+        startActivity(Intent(this, AlertsActivity::class.java).apply {
+            putExtra("alert_data", analisis) // Enviar objeto serializable
+            putExtra("alert_message", alertMessage) // Y también el mensaje formateado
+        })
+    }
     private fun setupNavigation() {
         navigationManager = NavigationManager(
             context = this,
@@ -841,11 +859,6 @@ class SensorDataActivity : BaseVoiceActivity() {
         showNoDataChart(binding.cardMq4.root, "Gas Metano", hayProcesoActivo)
     }
 
-    private fun showAlert(message: String) {
-        startActivity(Intent(this, AlertsActivity::class.java).apply {
-            putExtra("alert_message", message)
-        })
-    }
 
     override fun onBackPressed() {
         if (binding.containerSensor.isDrawerOpen(GravityCompat.START)) {
